@@ -740,6 +740,7 @@
       const ws = document.getElementById('coachWorkspace');
       const tabs = [
         { id: 'leaderboard', label: 'Event Leaderboard' },
+        { id: 'stopwatch', label: 'Live Splits Stopwatch' },
         { id: 'roster', label: 'Roster Manager' },
         { id: 'batch', label: 'Batch Meet Entry' },
         { id: 'lineup', label: 'Meet Lineup Builder' },
@@ -764,6 +765,7 @@
       `;
 
       if (currentCoachSubTab === 'leaderboard') renderLeaderboardView();
+      else if (currentCoachSubTab === 'stopwatch') renderStopwatchView();
       else if (currentCoachSubTab === 'roster') renderRosterView();
       else if (currentCoachSubTab === 'batch') renderBatchEntryView();
       else if (currentCoachSubTab === 'lineup') renderLineupBuilderView();
@@ -847,6 +849,341 @@
         </tr>
       `).join('');
     }
+      /* ==========================================================================
+       4B. COACH DASHBOARD — LIVE SPLITS STOPWATCH (UP TO 8 ATHLETES)
+       ========================================================================== */
+    let swState = {
+      running: false,
+      startTime: 0,
+      elapsedMs: 0,
+      rafId: null,
+      event: '800m',
+      sessionName: 'Track Splits',
+      isOfficial: false,
+      racers: [] // { id, name, division, lane, splits: [{ lap, splitMs, totalMs }], finished: false }
+    };
+
+    function formatStopwatchMs(ms) {
+      const totalHundredths = Math.floor(ms / 10);
+      const hundredths = totalHundredths % 100;
+      const totalSeconds = Math.floor(totalHundredths / 100);
+      const seconds = totalSeconds % 60;
+      const minutes = Math.floor(totalSeconds / 60);
+
+      const hStr = String(hundredths).padStart(2, '0');
+      const sStr = String(seconds).padStart(2, '0');
+      return minutes > 0 ? `${minutes}:${sStr}.${hStr}` : `${seconds}.${hStr}`;
+    }
+
+    function renderStopwatchView() {
+      const container = document.getElementById('coachSubView');
+      const trackEvents = getEnabledEventsList().filter(ev => !isFieldEvent(ev));
+      if (!trackEvents.includes(swState.event) && trackEvents.length > 0) {
+        swState.event = trackEvents;
+      }
+
+      const activeAthletes = [...appData.athletes]
+        .filter(a => a.Status === 'Active')
+        .sort((a, b) => a.Name.localeCompare(b.Name));
+
+      container.innerHTML = `
+        <div class="space-y-5">
+          <!-- TOP CLOCK BAR -->
+          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div class="text-center md:text-left">
+                <span class="text-xs font-bold uppercase tracking-widest text-rose-400">Live Race Timer</span>
+                <div id="swClockDisplay" class="text-5xl sm:text-6xl font-black font-mono tracking-tight text-white mt-1">
+                  ${formatStopwatchMs(swState.elapsedMs)}
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-center gap-2.5">
+                <button id="swStartPauseBtn" onclick="toggleStopwatch()"
+                  class="px-6 py-3.5 rounded-xl font-bold text-base transition shadow-lg ${
+                    swState.running
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  }">
+                  ${swState.running ? 'Pause Clock' : (swState.elapsedMs > 0 ? 'Resume' : 'Start Race')}
+                </button>
+                <button onclick="resetStopwatch()"
+                  class="px-4 py-3.5 rounded-xl font-semibold text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 transition">
+                  Reset
+                </button>
+                <button onclick="saveStopwatchToProfiles()"
+                  class="px-5 py-3.5 rounded-xl font-bold text-sm bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/30 transition">
+                  Save Splits to Profiles
+                </button>
+              </div>
+            </div>
+
+            <!-- RACE CONFIG BAR -->
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-700">
+              <div>
+                <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Race / Relay Event</label>
+                <select id="swEventSelect" onchange="swState.event = this.value"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
+                  ${trackEvents.map(ev => `<option value="${ev}" ${ev === swState.event ? 'selected' : ''}>${ev}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Session / Heat Label</label>
+                <input id="swSessionName" type="text" value="${swState.sessionName}" oninput="swState.sessionName = this.value"
+                  placeholder="e.g. Heat 1 or Tuesday Tempo"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white" />
+              </div>
+              <div>
+                <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Record As</label>
+                <select onchange="swState.isOfficial = (this.value === 'true')"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
+                  <option value="false" ${!swState.isOfficial ? 'selected' : ''}>Unofficial Splits / Practice</option>
+                  <option value="true" ${swState.isOfficial ? 'selected' : ''}>Official Meet</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Add Racer (${swState.racers.length}/8)</label>
+                <div class="flex gap-1.5">
+                  <select id="swAddAthleteSelect" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-white">
+                    <option value="">Select athlete...</option>
+                    ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name}</option>`).join('')}
+                  </select>
+                  <button type="button" onclick="addRacerToStopwatch()"
+                    class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3.5 py-2 rounded-xl text-sm">Add</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ACTIVE RACERS LIST -->
+          <div id="swRacersList" class="space-y-3"></div>
+        </div>
+      `;
+
+      renderStopwatchRacers();
+    }
+        function updateStopwatchTick() {
+      if (!swState.running) return;
+      swState.elapsedMs = performance.now() - swState.startTime;
+      const display = document.getElementById('swClockDisplay');
+      if (display) display.textContent = formatStopwatchMs(swState.elapsedMs);
+      swState.rafId = requestAnimationFrame(updateStopwatchTick);
+    }
+
+    function toggleStopwatch() {
+      if (swState.running) {
+        swState.running = false;
+        cancelAnimationFrame(swState.rafId);
+      } else {
+        if (swState.racers.length === 0) {
+          return alert('Add at least one athlete to the race before starting the clock.');
+        }
+        swState.running = true;
+        swState.startTime = performance.now() - swState.elapsedMs;
+        swState.rafId = requestAnimationFrame(updateStopwatchTick);
+      }
+      renderStopwatchView();
+    }
+
+    function resetStopwatch() {
+      if (swState.elapsedMs > 0 && !confirm('Reset the stopwatch and clear current unsaved splits?')) return;
+      swState.running = false;
+      cancelAnimationFrame(swState.rafId);
+      swState.elapsedMs = 0;
+      swState.racers.forEach(r => {
+        r.splits = [];
+        r.finished = false;
+      });
+      renderStopwatchView();
+    }
+
+    function addRacerToStopwatch() {
+      if (swState.racers.length >= 8) return alert('Maximum 8 athletes per race.');
+      const sel = document.getElementById('swAddAthleteSelect');
+      const athId = sel?.value;
+      if (!athId) return;
+
+      if (swState.racers.some(r => r.id === athId)) {
+        return alert('That athlete is already in this race.');
+      }
+
+      const ath = appData.athletes.find(a => a.Athlete_ID === athId);
+      if (!ath) return;
+
+      swState.racers.push({
+        id: ath.Athlete_ID,
+        name: ath.Name,
+        division: ath.Division,
+        lane: swState.racers.length + 1,
+        splits: [],
+        finished: false
+      });
+
+      renderStopwatchView();
+    }
+
+    function removeRacerFromStopwatch(athId) {
+      swState.racers = swState.racers.filter(r => r.id !== athId);
+      renderStopwatchView();
+    }
+
+    function updateRacerLane(athId, newLane) {
+      const racer = swState.racers.find(r => r.id === athId);
+      if (racer) racer.lane = newLane;
+    }
+
+    function recordRacerSplit(athId, isFinish = false) {
+      if (!swState.running && swState.elapsedMs === 0) {
+        return alert('Start the race clock first.');
+      }
+      const racer = swState.racers.find(r => r.id === athId);
+      if (!racer || racer.finished) return;
+
+      const currentMs = swState.running ? (performance.now() - swState.startTime) : swState.elapsedMs;
+      const prevTotalMs = racer.splits.length > 0 ? racer.splits[racer.splits.length - 1].totalMs : 0;
+      const lapMs = Math.max(0, currentMs - prevTotalMs);
+
+      racer.splits.push({
+        lap: racer.splits.length + 1,
+        lapMs,
+        totalMs: currentMs
+      });
+
+      if (isFinish) racer.finished = true;
+      renderStopwatchRacers();
+    }
+
+    function undoRacerLastSplit(athId) {
+      const racer = swState.racers.find(r => r.id === athId);
+      if (!racer || racer.splits.length === 0) return;
+      racer.splits.pop();
+      racer.finished = false;
+      renderStopwatchRacers();
+    }
+
+    function renderStopwatchRacers() {
+      const list = document.getElementById('swRacersList');
+      if (!list) return;
+
+      if (swState.racers.length === 0) {
+        list.innerHTML = `
+          <div class="bg-slate-800/60 border border-dashed border-slate-700 rounded-2xl p-8 text-center text-sm text-slate-400">
+            Select up to 8 athletes above to load them into lanes for live split timing.
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = swState.racers.map(r => {
+        const lastSplit = r.splits.length > 0 ? r.splits[r.splits.length - 1] : null;
+        const splitsSummary = r.splits.map(s =>
+          `<span class="inline-block bg-slate-900 border border-slate-700 rounded-md px-2 py-0.5 text-[11px] font-mono text-slate-300">L${s.lap}: ${formatStopwatchMs(s.lapMs)} <span class="text-slate-500">(${formatStopwatchMs(s.totalMs)})</span></span>`
+        ).join(' ');
+
+        return `
+          <div class="bg-slate-800 border ${r.finished ? 'border-amber-500/60' : 'border-slate-700'} rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="flex items-start sm:items-center gap-3">
+              <div class="flex flex-col items-center">
+                <span class="text-[10px] uppercase text-slate-400">Lane</span>
+                <input type="number" min="1" max="12" value="${r.lane}" onchange="updateRacerLane('${r.id}', this.value)"
+                  class="w-12 text-center bg-slate-900 border border-slate-700 rounded-lg py-1 font-mono font-bold text-amber-400 text-sm" />
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-base font-bold text-white">${r.name}</span>
+                  <span class="text-xs text-slate-400">(${r.division})</span>
+                  ${r.finished ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[11px] font-bold uppercase">Finished</span>` : ''}
+                </div>
+                <div class="flex flex-wrap gap-1.5 mt-1.5">
+                  ${splitsSummary || `<span class="text-xs text-slate-500">No splits recorded yet</span>`}
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between lg:justify-end gap-3 border-t lg:border-t-0 border-slate-700/70 pt-3 lg:pt-0">
+              <div class="text-right mr-1">
+                <span class="block text-[10px] uppercase text-slate-400">${lastSplit ? `Lap ${lastSplit.lap} Split` : 'Elapsed'}</span>
+                <span class="font-mono font-black text-lg text-amber-400">${lastSplit ? formatStopwatchMs(lastSplit.lapMs) : '--'}</span>
+              </div>
+
+              <button type="button" onclick="recordRacerSplit('${r.id}', false)" ${r.finished ? 'disabled' : ''}
+                class="px-5 py-3 rounded-xl font-bold text-sm transition ${
+                  r.finished
+                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    : 'bg-rose-600 hover:bg-rose-500 active:scale-95 text-white shadow-md shadow-rose-900/30'
+                }">
+                Split / Lap
+              </button>
+
+              <button type="button" onclick="recordRacerSplit('${r.id}', true)" ${r.finished ? 'disabled' : ''}
+                class="px-4 py-3 rounded-xl font-bold text-sm transition ${
+                  r.finished
+                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    : 'bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950'
+                }">
+                Finish
+              </button>
+
+              <div class="flex flex-col gap-1 text-[11px]">
+                ${r.splits.length > 0 ? `<button type="button" onclick="undoRacerLastSplit('${r.id}')" class="text-slate-400 hover:text-amber-400 underline">Undo</button>` : ''}
+                <button type="button" onclick="removeRacerFromStopwatch('${r.id}')" class="text-slate-500 hover:text-rose-400 underline">Remove</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function saveStopwatchToProfiles() {
+      const racersWithSplits = swState.racers.filter(r => r.splits.length > 0);
+      if (racersWithSplits.length === 0) {
+        return alert('Record at least one split before saving to athlete profiles.');
+      }
+
+      if (swState.running) {
+        swState.running = false;
+        cancelAnimationFrame(swState.rafId);
+      }
+
+      const category = Object.keys(EVENT_CATALOG).find(cat =>
+        EVENT_CATALOG[cat].includes(swState.event)
+      ) || 'Distance';
+
+      const today = new Date().toISOString().slice(0, 10);
+      const baseLabel = swState.sessionName.trim() || 'Track Splits';
+
+      const logsToSave = racersWithSplits.map(r => {
+        const finalSplit = r.splits[r.splits.length - 1];
+        const totalSec = Number((finalSplit.totalMs / 1000).toFixed(2));
+        const formattedTotal = formatStopwatchMs(finalSplit.totalMs);
+        const lapBreakdown = r.splits.map(s => `L${s.lap}:${formatStopwatchMs(s.lapMs)}`).join(' | ');
+
+        return {
+          Date: today,
+          Meet_Name: `${baseLabel} [${lapBreakdown}]`,
+          Athlete_ID: r.id,
+          Athlete_Name: r.name,
+          Division: r.division,
+          Category: category,
+          Event: swState.event,
+          Raw_Mark: formattedTotal,
+          Numeric_Value: totalSec,
+          Is_Official: swState.isOfficial,
+          Entered_By: 'Coach-Stopwatch'
+        };
+      });
+
+      await StorageAdapter.addLogs(logsToSave);
+      appData = await StorageAdapter.getAllData();
+
+      alert(`Saved split data and race marks for ${logsToSave.length} athlete(s).`);
+      swState.elapsedMs = 0;
+      swState.racers.forEach(r => {
+        r.splits = [];
+        r.finished = false;
+      });
+      renderStopwatchView();
+    }
+    
     /* ==========================================================================
        5. COACH DASHBOARD — ROSTER MANAGER & BATCH ENTRY TOOL
        ========================================================================== */
