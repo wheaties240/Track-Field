@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StatSlate — Track & Field Analytics</title>
+  <script src="https://tailwindcss.com"></script>
+  <script src="https://cloudflare.com"></script>
+  <style>
+    @media print {
+      body { background: #ffffff !important; color: #0f172a !important; }
+      .no-print { display: none !important; }
+      .print-card {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border: 2px solid #cbd5e1 !important;
+        box-shadow: none !important;
+      }
+      .print-card * { color: #0f172a !important; border-color: #cbd5e1 !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-rose-600 flex items-center justify-center font-black tracking-tight text-white shadow-lg shadow-rose-900/40">SS</div>
+        <div>
+          <h1 id="headerProgramName" class="text-lg font-bold tracking-tight text-white">StatSlate Track &amp; Field</h1>
+          <p class="text-xs text-slate-400">Performance &amp; Meet Analytics</p>
+        </div>
+      </div>
+      <nav class="flex bg-slate-900 p-1 rounded-xl border border-slate-700">
+        <button id="tabBtnAthlete" onclick="switchTab('athlete')" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-rose-600 text-white">Meet &amp; Practice Log</button>
+        <button id="tabBtnCoach" onclick="switchTab('coach')" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white">Coach Dashboard</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+    <!-- ATHLETE VIEW -->
+    <section id="viewAthlete" class="space-y-6">
+      <div id="athleteGate" class="max-w-md mx-auto bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold text-white mb-1">Athlete Check-In</h2>
+        <p class="text-sm text-slate-400 mb-4">Enter your team access code to log meet or practice results.</p>
+        <form onsubmit="unlockAthlete(event)" class="space-y-4">
+          <input id="inputTeamCode" type="text" placeholder="Team Code (Default: TRACK26)" required
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white uppercase tracking-wider focus:outline-none focus:border-rose-500" />
+          <p id="athleteGateError" class="text-xs text-rose-400 hidden">Invalid team code. Please check with your coach.</p>
+          <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-semibold py-3 rounded-xl transition">Unlock Athlete Logger</button>
+        </form>
+      </div>
+
+      <div id="athleteLogger" class="hidden max-w-2xl mx-auto space-y-6">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h2 class="text-xl font-bold text-white">Log Performance Mark</h2>
+              <p class="text-xs text-slate-400">Select your name, event, and official or practice mark.</p>
+            </div>
+            <button onclick="lockAthlete()" class="text-xs text-slate-400 hover:text-rose-400 underline">Lock</button>
+          </div>
+          <form onsubmit="submitAthleteLog(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Athlete Name</label>
+              <select id="athSelect" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500"></select>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Event Category</label>
+                <select id="athCategorySelect" onchange="populateEventDropdown('athCategorySelect', 'athEventSelect')" required
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500"></select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Event</label>
+                <select id="athEventSelect" onchange="updateMarkPlaceholder()" required
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500"></select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Result / Mark</label>
+              <input id="athMarkInput" type="text" placeholder="e.g. 12.45 or 2:14.30" required
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-lg font-mono focus:outline-none focus:border-rose-500" />
+              <p class="text-xs text-slate-400 mt-1">Track: seconds (12.45) or min:sec (2:14.30). Field: feet-inches (18-04.5) or meters (5.60m).</p>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Session Type</label>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="cursor-pointer">
+                  <input type="radio" name="athOfficial" value="true" checked class="peer sr-only" />
+                  <div class="text-center py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-400 font-semibold text-sm peer-checked:bg-rose-600 peer-checked:text-white peer-checked:border-rose-500 transition">Official Meet</div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="athOfficial" value="false" class="peer sr-only" />
+                  <div class="text-center py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-400 font-semibold text-sm peer-checked:bg-amber-500 peer-checked:text-slate-950 peer-checked:border-amber-400 transition">Practice</div>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-rose-900/30 transition">Submit Mark</button>
+          </form>
+        </div>
+
+        <div id="sessionReceiptsContainer" class="hidden bg-slate-800 border border-slate-700 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-amber-400">Session Receipts</h3>
+            <span id="receiptCount" class="text-xs text-slate-400">0 logged</span>
+          </div>
+          <div id="sessionReceiptsList" class="space-y-2"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COACH VIEW -->
+    <section id="viewCoach" class="hidden space-y-6">
+      <div id="coachGate" class="max-w-md mx-auto bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold text-white mb-1">Coach Access</h2>
+        <p class="text-sm text-slate-400 mb-4">Enter your coaching PIN to access roster, leaderboards, and meet tools.</p>
+        <form onsubmit="unlockCoach(event)" class="space-y-4">
+          <input id="inputCoachPin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="Coach PIN (Default: 1234)" required
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-center text-xl tracking-widest focus:outline-none focus:border-rose-500" />
+          <p id="coachGateError" class="text-xs text-rose-400 hidden">Incorrect PIN.</p>
+          <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-semibold py-3 rounded-xl transition">Unlock Coach Dashboard</button>
+        </form>
+      </div>
+      <div id="coachWorkspace" class="hidden space-y-6"></div>
+    </section>
+  </main>
+
+  <footer class="border-t border-slate-800 py-4 px-4 text-center text-xs text-slate-500 no-print">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>StatSlate Athletics Platform</span>
+      <button onclick="openRawDataModal()" class="text-slate-500 hover:text-slate-300 underline transition">Manage Raw Meet Data</button>
+    </div>
+  </footer>
+
+  <div id="modalsRoot"></div>
+  <script>
+    /* ==========================================================================
+       1. CLOUD-READY DATA ADAPTER (localStorage + Seed Data using 'athletes')
+       ========================================================================== */
+    const STORAGE_KEY = 'statslate_tf_v1';
+
+    const EVENT_CATALOG = {
+      Sprints: ['60m', '100m', '200m', '400m'],
+      Distance: ['800m', '1600m', '3200m'],
+      Hurdles: ['100m Hurdles', '110m Hurdles', '300m Hurdles'],
+      Relays: ['4x100m Relay', '4x200m Relay', '4x400m Relay', '4x800m Relay'],
+      Jumps: ['Long Jump', 'Triple Jump', 'High Jump', 'Pole Vault'],
+      Throws: ['Shot Put', 'Discus', 'Javelin']
+    };
+
+    const FIELD_EVENTS = new Set([
+      'Long Jump', 'Triple Jump', 'High Jump', 'Pole Vault',
+      'Shot Put', 'Discus', 'Javelin'
+    ]);
+
+    const DEFAULT_SEED_DATA = {
+      settings: {
+        Team_Code: 'TRACK26',
+        Coach_PIN: '1234',
+        Program_Name: 'StatSlate Track & Field'
+      },
+      athletes: [
+        { Athlete_ID: 'ATH-101', Name: 'Jordan Taylor', Division: '8th Grade', Event_Group: 'Sprints', Status: 'Active' },
+        { Athlete_ID: 'ATH-102', Name: 'Maya Lin', Division: '8th Grade', Event_Group: 'Distance', Status: 'Active' },
+        { Athlete_ID: 'ATH-103', Name: 'Devon Brooks', Division: '7th Grade', Event_Group: 'Jumps', Status: 'Active' },
+        { Athlete_ID: 'ATH-104', Name: 'Elena Rostova', Division: '8th Grade', Event_Group: 'Throws', Status: 'Active' },
+        { Athlete_ID: 'ATH-105', Name: 'Marcus Vance', Division: '7th Grade', Event_Group: 'Sprints', Status: 'Active' }
+      ],
+      logs: [
+        { Log_ID: 'LOG-1', Date: '2026-03-28', Meet_Name: 'Season Opener', Athlete_ID: 'ATH-101', Athlete_Name: 'Jordan Taylor', Division: '8th Grade', Category: 'Sprints', Event: '100m', Raw_Mark: '12.48', Numeric_Value: 12.48, Is_Official: true, Entered_By: 'Coach' },
+        { Log_ID: 'LOG-2', Date: '2026-04-04', Meet_Name: 'City Relays', Athlete_ID: 'ATH-101', Athlete_Name: 'Jordan Taylor', Division: '8th Grade', Category: 'Sprints', Event: '100m', Raw_Mark: '12.21', Numeric_Value: 12.21, Is_Official: true, Entered_By: 'Athlete' },
+        { Log_ID: 'LOG-3', Date: '2026-04-11', Meet_Name: 'District Dual', Athlete_ID: 'ATH-101', Athlete_Name: 'Jordan Taylor', Division: '8th Grade', Category: 'Sprints', Event: '100m', Raw_Mark: '12.09', Numeric_Value: 12.09, Is_Official: true, Entered_By: 'Coach' },
+        { Log_ID: 'LOG-4', Date: '2026-04-11', Meet_Name: 'District Dual', Athlete_ID: 'ATH-105', Athlete_Name: 'Marcus Vance', Division: '7th Grade', Category: 'Sprints', Event: '100m', Raw_Mark: '12.85', Numeric_Value: 12.85, Is_Official: true, Entered_By: 'Athlete' },
+        { Log_ID: 'LOG-5', Date: '2026-04-04', Meet_Name: 'City Relays', Athlete_ID: 'ATH-102', Athlete_Name: 'Maya Lin', Division: '8th Grade', Category: 'Distance', Event: '1600m', Raw_Mark: '5:34.20', Numeric_Value: 334.20, Is_Official: true, Entered_By: 'Coach' },
+        { Log_ID: 'LOG-6', Date: '2026-04-11', Meet_Name: 'District Dual', Athlete_ID: 'ATH-102', Athlete_Name: 'Maya Lin', Division: '8th Grade', Category: 'Distance', Event: '1600m', Raw_Mark: '5:28.10', Numeric_Value: 328.10, Is_Official: true, Entered_By: 'Coach' },
+        { Log_ID: 'LOG-7', Date: '2026-04-04', Meet_Name: 'City Relays', Athlete_ID: 'ATH-103', Athlete_Name: 'Devon Brooks', Division: '7th Grade', Category: 'Jumps', Event: 'Long Jump', Raw_Mark: '16-08.50', Numeric_Value: 200.5, Is_Official: true, Entered_By: 'Coach' },
+        { Log_ID: 'LOG-8', Date: '2026-04-11', Meet_Name: 'District Dual', Athlete_ID: 'ATH-103', Athlete_Name: 'Devon Brooks', Division: '7th Grade', Category: 'Jumps', Event: 'Long Jump', Raw_Mark: '17-03.00', Numeric_Value: 207.0, Is_Official: true, Entered_By: 'Athlete' },
+        { Log_ID: 'LOG-9', Date: '2026-04-11', Meet_Name: 'District Dual', Athlete_ID: 'ATH-104', Athlete_Name: 'Elena Rostova', Division: '8th Grade', Category: 'Throws', Event: 'Shot Put', Raw_Mark: '34-06.00', Numeric_Value: 414.0, Is_Official: true, Entered_By: 'Coach' }
+      ]
+    };
+
+    const StorageAdapter = {
+      _read() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          this._write(DEFAULT_SEED_DATA);
+          return JSON.parse(JSON.stringify(DEFAULT_SEED_DATA));
+        }
+        return JSON.parse(raw);
+      },
+      _write(db) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      },
+      async getAllData() {
+        return this._read();
+      },
+      async addLogs(newLogs) {
+        const db = this._read();
+        const stamp = Date.now();
+        const created = newLogs.map((item, idx) => ({
+          Log_ID: item.Log_ID || `LOG-${stamp + idx}`,
+          Date: item.Date || new Date().toISOString().slice(0, 10),
+          Meet_Name: item.Meet_Name || (item.Is_Official ? 'Official Meet' : 'Practice'),
+          Athlete_ID: item.Athlete_ID || '',
+          Athlete_Name: item.Athlete_Name,
+          Division: item.Division || '',
+          Category: item.Category,
+          Event: item.Event,
+          Raw_Mark: item.Raw_Mark,
+          Numeric_Value: Number(item.Numeric_Value),
+          Is_Official: Boolean(item.Is_Official),
+          Entered_By: item.Entered_By || 'Athlete'
+        }));
+        db.logs.push(...created);
+        this._write(db);
+        return created;
+      },
+      async updateLog(updatedLog) {
+        const db = this._read();
+        const idx = db.logs.findIndex(l => l.Log_ID === updatedLog.Log_ID);
+        if (idx !== -1) {
+          db.logs[idx] = { ...db.logs[idx], ...updatedLog };
+          this._write(db);
+        }
+      },
+      async deleteLog(logId) {
+        const db = this._read();
+        db.logs = db.logs.filter(l => l.Log_ID !== logId);
+        this._write(db);
+      },
+      async saveAthlete(athlete) {
+        const db = this._read();
+        if (athlete.Athlete_ID) {
+          const idx = db.athletes.findIndex(a => a.Athlete_ID === athlete.Athlete_ID);
+          if (idx !== -1) db.athletes[idx] = athlete;
+        } else {
+          athlete.Athlete_ID = `ATH-${Date.now()}`;
+          db.athletes.push(athlete);
+        }
+        this._write(db);
+        return athlete;
+      },
+      async deleteAthlete(athleteId) {
+        const db = this._read();
+        db.athletes = db.athletes.filter(a => a.Athlete_ID !== athleteId);
+        this._write(db);
+      },
+      async updateSettings(newSettings) {
+        const db = this._read();
+        db.settings = { ...db.settings, ...newSettings };
+        this._write(db);
+      },
+      async replaceAll(fullData) {
+        this._write(fullData);
+      }
+    };
+    /* ==========================================================================
+       2. SMART MARK PARSER & PURE ANALYTICS ENGINE
+       ========================================================================== */
+    function isFieldEvent(eventName) {
+      return FIELD_EVENTS.has(eventName);
+    }
+
+    function parseMarkInput(rawInput, eventName) {
+      const cleaned = String(rawInput).trim();
+      if (!cleaned) return null;
+
+      if (isFieldEvent(eventName)) {
+        if (/m$/i.test(cleaned)) {
+          const meters = parseFloat(cleaned.replace(/m$/i, '').trim());
+          if (isNaN(meters) || meters <= 0) return null;
+          return {
+            rawFormatted: `${meters.toFixed(2)}m`,
+            numericValue: Number((meters * 39.3701).toFixed(3))
+          };
+        }
+        const impMatch = cleaned.match(/^(\d+)\s*[-'\s]\s*(\d+(?:\.\d+)?)["]?$/);
+        if (impMatch) {
+          const feet = parseInt(impMatch, 10);
+          const inches = parseFloat(impMatch);
+          if (isNaN(feet) || isNaN(inches) || inches >= 12) return null;
+          const totalInches = (feet * 12) + inches;
+          const inchStr = inches < 10 ? `0${inches.toFixed(2)}` : inches.toFixed(2);
+          return {
+            rawFormatted: `${feet}-${inchStr.replace(/\.00$/, '')}`,
+            numericValue: Number(totalInches.toFixed(3))
+          };
+        }
+        const plainFloat = parseFloat(cleaned);
+        if (!isNaN(plainFloat) && plainFloat > 0) {
+          return {
+            rawFormatted: `${plainFloat.toFixed(2)} ft`,
+            numericValue: Number((plainFloat * 12).toFixed(3))
+          };
+        }
+        return null;
+      } else {
+        if (cleaned.includes(':')) {
+          const parts = cleaned.split(':');
+          if (parts.length !== 2) return null;
+          const mins = parseInt(parts, 10);
+          const secs = parseFloat(parts);
+          if (isNaN(mins) || isNaN(secs) || secs >= 60 || secs < 0) return null;
+          const totalSeconds = (mins * 60) + secs;
+          const secFormatted = secs < 10 ? `0${secs.toFixed(2)}` : secs.toFixed(2);
+          return {
+            rawFormatted: `${mins}:${secFormatted}`,
+            numericValue: Number(totalSeconds.toFixed(3))
+          };
+        } else {
+          const secs = parseFloat(cleaned);
+          if (isNaN(secs) || secs <= 0) return null;
+          return {
+            rawFormatted: secs.toFixed(2),
+            numericValue: Number(secs.toFixed(3))
+          };
+        }
+      }
+    }
+
+    const StatsEngine = {
+      sortChronological(logs) {
+        return [...logs].sort((a, b) => a.Date.localeCompare(b.Date));
+      },
+
+      isBetterMark(newVal, oldVal, isField) {
+        return isField ? newVal > oldVal : newVal < oldVal;
+      },
+
+      buildEventLeaderboard(logs, eventName, divisionFilter = 'ALL', officialFilter = 'ALL') {
+        const isField = isFieldEvent(eventName);
+        const filtered = logs.filter(l => {
+          if (l.Event !== eventName) return false;
+          if (divisionFilter !== 'ALL' && l.Division !== divisionFilter) return false;
+          if (officialFilter === 'OFFICIAL' && !l.Is_Official) return false;
+          if (officialFilter === 'PRACTICE' && l.Is_Official) return false;
+          return true;
+        });
+
+        const byAthlete = {};
+        filtered.forEach(log => {
+          const key = log.Athlete_Name;
+          if (!byAthlete[key]) byAthlete[key] = [];
+          byAthlete[key].push(log);
+        });
+
+        const board = Object.keys(byAthlete).map(name => {
+          const history = this.sortChronological(byAthlete[name]);
+          let prLog = history;
+          let sum = 0;
+
+          history.forEach(entry => {
+            sum += entry.Numeric_Value;
+            if (this.isBetterMark(entry.Numeric_Value, prLog.Numeric_Value, isField)) {
+              prLog = entry;
+            }
+          });
+
+          const avg = sum / history.length;
+          const latest = history[history.length - 1];
+          let trend = 'FLAT';
+
+          if (history.length >= 2) {
+            const diff = latest.Numeric_Value - avg;
+            const threshold = avg * 0.003;
+            if (isField) {
+              if (diff > threshold) trend = 'UP';
+              else if (diff < -threshold) trend = 'DOWN';
+            } else {
+              if (diff < -threshold) trend = 'UP';
+              else if (diff > threshold) trend = 'DOWN';
+            }
+          }
+
+          return {
+            athleteId: latest.Athlete_ID,
+            athleteName: name,
+            division: latest.Division,
+            prMark: prLog.Raw_Mark,
+            prNumeric: prLog.Numeric_Value,
+            prDate: prLog.Date,
+            prMeet: prLog.Meet_Name,
+            latestMark: latest.Raw_Mark,
+            latestDate: latest.Date,
+            attempts: history.length,
+            trend,
+            history
+          };
+        });
+
+        return board.sort((a, b) =>
+          isField ? b.prNumeric - a.prNumeric : a.prNumeric - b.prNumeric
+        );
+      },
+
+      getAthleteProfile(athlete, allLogs) {
+        const athLogs = this.sortChronological(
+          allLogs.filter(l => l.Athlete_Name === athlete.Name)
+        );
+        const eventSummary = {};
+
+        athLogs.forEach(log => {
+          const isField = isFieldEvent(log.Event);
+          if (!eventSummary[log.Event]) {
+            eventSummary[log.Event] = {
+              event: log.Event,
+              category: log.Category,
+              prMark: log.Raw_Mark,
+              prNumeric: log.Numeric_Value,
+              prDate: log.Date,
+              prMeet: log.Meet_Name,
+              marks: []
+            };
+          }
+          const bucket = eventSummary[log.Event];
+          bucket.marks.push(log);
+          if (this.isBetterMark(log.Numeric_Value, bucket.prNumeric, isField)) {
+            bucket.prMark = log.Raw_Mark;
+            bucket.prNumeric = log.Numeric_Value;
+            bucket.prDate = log.Date;
+            bucket.prMeet = log.Meet_Name;
+          }
+        });
+
+        return {
+          athlete,
+          totalEntries: athLogs.length,
+          events: Object.values(eventSummary),
+          recentLogs: [...athLogs].reverse()
+        };
+      },
+
+      renderTrendIcon(trend) {
+        if (trend === 'UP') {
+          return `<span title="Trending Faster/Further vs Season Avg" class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-500/15 text-emerald-400">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M17 7H8M17 7V16"/></svg>
+          </span>`;
+        }
+        if (trend === 'DOWN') {
+          return `<span title="Trending Slower/Shorter vs Season Avg" class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-rose-500/15 text-rose-400">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7L17 17M17 17H8M17 17V8"/></svg>
+          </span>`;
+        }
+        return `<span title="Steady Form" class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-slate-700/50 text-slate-400">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12H19"/></svg>
+        </span>`;
+      }
+    };
+    /* ==========================================================================
+       3. UI CONTROLLER — STATE, GATES & ATHLETE VIEW
+       ========================================================================== */
+    let appData = { settings: {}, athletes: [], logs: [] };
+    let sessionReceipts = [];
+    let currentCoachSubTab = 'leaderboard';
+
+    async function initApp() {
+      appData = await StorageAdapter.getAllData();
+      document.getElementById('headerProgramName').textContent =
+        appData.settings.Program_Name || 'StatSlate Track & Field';
+
+      populateCategoryDropdown('athCategorySelect');
+      populateEventDropdown('athCategorySelect', 'athEventSelect');
+      refreshAthleteDropdowns();
+
+      if (localStorage.getItem('statslate_tf_ath_unlocked') === 'true') {
+        showAthleteLogger();
+      }
+      if (sessionStorage.getItem('statslate_tf_coach_unlocked') === 'true') {
+        showCoachWorkspace();
+      }
+    }
+
+    function switchTab(tab) {
+      const isAth = tab === 'athlete';
+      document.getElementById('viewAthlete').classList.toggle('hidden', !isAth);
+      document.getElementById('viewCoach').classList.toggle('hidden', isAth);
+
+      const btnAth = document.getElementById('tabBtnAthlete');
+      const btnCoach = document.getElementById('tabBtnCoach');
+
+      btnAth.className = isAth
+        ? 'px-4 py-2 rounded-lg text-sm font-semibold transition bg-rose-600 text-white'
+        : 'px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white';
+
+      btnCoach.className = !isAth
+        ? 'px-4 py-2 rounded-lg text-sm font-semibold transition bg-rose-600 text-white'
+        : 'px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white';
+    }
+
+    function unlockAthlete(e) {
+      e.preventDefault();
+      const entered = document.getElementById('inputTeamCode').value.trim().toUpperCase();
+      const expected = (appData.settings.Team_Code || 'TRACK26').toUpperCase();
+      if (entered === expected) {
+        localStorage.setItem('statslate_tf_ath_unlocked', 'true');
+        document.getElementById('athleteGateError').classList.add('hidden');
+        showAthleteLogger();
+      } else {
+        document.getElementById('athleteGateError').classList.remove('hidden');
+      }
+    }
+
+    function lockAthlete() {
+      localStorage.removeItem('statslate_tf_ath_unlocked');
+      document.getElementById('athleteGate').classList.remove('hidden');
+      document.getElementById('athleteLogger').classList.add('hidden');
+    }
+
+    function showAthleteLogger() {
+      document.getElementById('athleteGate').classList.add('hidden');
+      document.getElementById('athleteLogger').classList.remove('hidden');
+      refreshAthleteDropdowns();
+    }
+
+    function populateCategoryDropdown(selectId) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.innerHTML = Object.keys(EVENT_CATALOG)
+        .map(cat => `<option value="${cat}">${cat}</option>`)
+        .join('');
+    }
+
+    function populateEventDropdown(catSelectId, eventSelectId) {
+      const cat = document.getElementById(catSelectId)?.value || 'Sprints';
+      const evSel = document.getElementById(eventSelectId);
+      if (!evSel) return;
+      const events = EVENT_CATALOG[cat] || [];
+      evSel.innerHTML = events.map(ev => `<option value="${ev}">${ev}</option>`).join('');
+      updateMarkPlaceholder();
+    }
+
+    function updateMarkPlaceholder() {
+      const ev = document.getElementById('athEventSelect')?.value || '';
+      const input = document.getElementById('athMarkInput');
+      if (!input) return;
+      input.placeholder = isFieldEvent(ev)
+        ? 'e.g. 18-04.5 or 5.60m'
+        : 'e.g. 12.45 or 2:14.30';
+    }
+
+    function refreshAthleteDropdowns() {
+      const activeAthletes = [...appData.athletes]
+        .filter(a => a.Status === 'Active')
+        .sort((a, b) => a.Name.localeCompare(b.Name));
+
+      const athSel = document.getElementById('athSelect');
+      if (athSel) {
+        athSel.innerHTML = `<option value="">Select your name...</option>` +
+          activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name} (${a.Division})</option>`).join('');
+      }
+    }
+
+    async function submitAthleteLog(e) {
+      e.preventDefault();
+      const athId = document.getElementById('athSelect').value;
+      const athlete = appData.athletes.find(a => a.Athlete_ID === athId);
+      if (!athlete) return alert('Please select an athlete.');
+
+      const category = document.getElementById('athCategorySelect').value;
+      const eventName = document.getElementById('athEventSelect').value;
+      const rawInput = document.getElementById('athMarkInput').value;
+      const parsed = parseMarkInput(rawInput, eventName);
+
+      if (!parsed) {
+        return alert('Invalid mark format. Use seconds (12.45), min:sec (2:14.30), feet-inches (18-04.5), or meters (5.60m).');
+      }
+
+      const isOfficial = document.querySelector('input[name="athOfficial"]:checked').value === 'true';
+      const today = new Date().toISOString().slice(0, 10);
+
+      const newEntry = {
+        Date: today,
+        Meet_Name: isOfficial ? 'Official Meet' : 'Practice',
+        Athlete_ID: athlete.Athlete_ID,
+        Athlete_Name: athlete.Name,
+        Division: athlete.Division,
+        Category: category,
+        Event: eventName,
+        Raw_Mark: parsed.rawFormatted,
+        Numeric_Value: parsed.numericValue,
+        Is_Official: isOfficial,
+        Entered_By: 'Athlete'
+      };
+
+      const [saved] = await StorageAdapter.addLogs([newEntry]);
+      appData = await StorageAdapter.getAllData();
+
+      sessionReceipts.unshift(saved);
+      renderSessionReceipts();
+
+      document.getElementById('athMarkInput').value = '';
+    }
+
+    function renderSessionReceipts() {
+      const box = document.getElementById('sessionReceiptsContainer');
+      const list = document.getElementById('sessionReceiptsList');
+      const count = document.getElementById('receiptCount');
+
+      if (sessionReceipts.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      box.classList.remove('hidden');
+      count.textContent = `${sessionReceipts.length} logged`;
+      list.innerHTML = sessionReceipts.map(r => `
+        <div class="flex items-center justify-between bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3">
+          <div>
+            <p class="text-sm font-bold text-white">${r.Athlete_Name} <span class="text-xs font-normal text-slate-400">(${r.Division})</span></p>
+            <p class="text-xs text-slate-400">${r.Event} &bull; ${r.Is_Official ? 'Official Meet' : 'Practice'}</p>
+          </div>
+          <div class="text-right">
+            <span class="font-mono text-base font-bold text-amber-400">${r.Raw_Mark}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+    /* ==========================================================================
+       4. COACH DASHBOARD — SHELL & EVENT LEADERBOARD
+       ========================================================================== */
+    function unlockCoach(e) {
+      e.preventDefault();
+      const entered = document.getElementById('inputCoachPin').value.trim();
+      const expected = String(appData.settings.Coach_PIN || '1234').trim();
+      if (entered === expected) {
+        sessionStorage.setItem('statslate_tf_coach_unlocked', 'true');
+        document.getElementById('coachGateError').classList.add('hidden');
+        showCoachWorkspace();
+      } else {
+        document.getElementById('coachGateError').classList.remove('hidden');
+      }
+    }
+
+    function lockCoach() {
+      sessionStorage.removeItem('statslate_tf_coach_unlocked');
+      document.getElementById('coachGate').classList.remove('hidden');
+      document.getElementById('coachWorkspace').classList.add('hidden');
+    }
+
+    function showCoachWorkspace() {
+      document.getElementById('coachGate').classList.add('hidden');
+      document.getElementById('coachWorkspace').classList.remove('hidden');
+      renderCoachWorkspace();
+    }
+
+    function switchCoachSubTab(subTab) {
+      currentCoachSubTab = subTab;
+      renderCoachWorkspace();
+    }
+
+    function renderCoachWorkspace() {
+      const ws = document.getElementById('coachWorkspace');
+      const tabs = [
+        { id: 'leaderboard', label: 'Event Leaderboard' },
+        { id: 'roster', label: 'Roster Manager' },
+        { id: 'batch', label: 'Batch Meet Entry' },
+        { id: 'lineup', label: 'Meet Lineup Builder' },
+        { id: 'settings', label: 'Program Settings' }
+      ];
+
+      ws.innerHTML = `
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 no-print">
+          <div class="flex flex-wrap gap-1.5">
+            ${tabs.map(t => `
+              <button onclick="switchCoachSubTab('${t.id}')"
+                class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+                  currentCoachSubTab === t.id
+                    ? 'bg-rose-600 text-white shadow'
+                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-700'
+                }">${t.label}</button>
+            `).join('')}
+          </div>
+          <button onclick="lockCoach()" class="text-xs text-slate-400 hover:text-rose-400 underline px-2">Lock Coach</button>
+        </div>
+        <div id="coachSubView"></div>
+      `;
+
+      if (currentCoachSubTab === 'leaderboard') renderLeaderboardView();
+      else if (currentCoachSubTab === 'roster') renderRosterView();
+      else if (currentCoachSubTab === 'batch') renderBatchEntryView();
+      else if (currentCoachSubTab === 'lineup') renderLineupBuilderView();
+      else if (currentCoachSubTab === 'settings') renderSettingsView();
+    }
+
+    function renderLeaderboardView() {
+      const container = document.getElementById('coachSubView');
+      const allEvents = Object.values(EVENT_CATALOG).flat();
+      const divisions = ['ALL', ...new Set(appData.athletes.map(a => a.Division).filter(Boolean))];
+
+      container.innerHTML = `
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-white">Event Leaderboard &amp; PR Tracker</h2>
+              <p class="text-xs text-slate-400">Click any athlete row to open their printable MLB-style performance card.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <select id="lbEventFilter" onchange="updateLeaderboardTable()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-rose-500">
+                ${allEvents.map(ev => `<option value="${ev}" ${ev === '100m' ? 'selected' : ''}>${ev}</option>`).join('')}
+              </select>
+              <select id="lbDivFilter" onchange="updateLeaderboardTable()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-rose-500">
+                ${divisions.map(d => `<option value="${d}">${d === 'ALL' ? 'All Divisions' : d}</option>`).join('')}
+              </select>
+              <select id="lbTypeFilter" onchange="updateLeaderboardTable()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-rose-500">
+                <option value="ALL">Official + Practice</option>
+                <option value="OFFICIAL">Official Meets Only</option>
+                <option value="PRACTICE">Practice Only</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-700 text-xs uppercase tracking-wider text-slate-400">
+                  <th class="py-3 px-3">Rank</th>
+                  <th class="py-3 px-3">Athlete</th>
+                  <th class="py-3 px-3">Division</th>
+                  <th class="py-3 px-3">Season PR</th>
+                  <th class="py-3 px-3">Latest Mark</th>
+                  <th class="py-3 px-3 text-center">Form</th>
+                  <th class="py-3 px-3 text-right">Marks</th>
+                </tr>
+              </thead>
+              <tbody id="lbTableBody" class="divide-y divide-slate-700/60 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      updateLeaderboardTable();
+    }
+
+    function updateLeaderboardTable() {
+      const eventName = document.getElementById('lbEventFilter').value;
+      const divFilter = document.getElementById('lbDivFilter').value;
+      const typeFilter = document.getElementById('lbTypeFilter').value;
+      const tbody = document.getElementById('lbTableBody');
+
+      const rows = StatsEngine.buildEventLeaderboard(appData.logs, eventName, divFilter, typeFilter);
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">No marks recorded for ${eventName} with current filters.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map((row, idx) => `
+        <tr onclick="openAthleteCardModal('${row.athleteName.replace(/'/g, "\\'")}')" class="hover:bg-slate-700/40 cursor-pointer transition">
+          <td class="py-3 px-3 font-bold ${idx === 0 ? 'text-amber-400' : 'text-slate-400'}">#${idx + 1}</td>
+          <td class="py-3 px-3 font-semibold text-white">${row.athleteName}</td>
+          <td class="py-3 px-3 text-slate-400 text-xs">${row.division}</td>
+          <td class="py-3 px-3">
+            <span class="font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-lg">${row.prMark}</span>
+            <span class="block text-[11px] text-slate-500 mt-0.5">${row.prMeet} (${row.prDate})</span>
+          </td>
+          <td class="py-3 px-3 font-mono text-slate-200">${row.latestMark} <span class="text-xs text-slate-500">(${row.latestDate})</span></td>
+          <td class="py-3 px-3 text-center">${StatsEngine.renderTrendIcon(row.trend)}</td>
+          <td class="py-3 px-3 text-right text-slate-400">${row.attempts}</td>
+        </tr>
+      `).join('');
+    }
+    /* ==========================================================================
+       5. COACH DASHBOARD — ROSTER MANAGER & BATCH ENTRY TOOL
+       ========================================================================== */
+    function renderRosterView() {
+      const container = document.getElementById('coachSubView');
+      const sorted = [...appData.athletes].sort((a, b) => a.Name.localeCompare(b.Name));
+
+      container.innerHTML = `
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 h-fit">
+            <h3 id="rosterFormTitle" class="text-lg font-bold text-white mb-4">Add / Edit Athlete</h3>
+            <form onsubmit="saveRosterAthlete(event)" class="space-y-3">
+              <input type="hidden" id="editAthleteId" value="" />
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Full Name</label>
+                <input id="editAthleteName" type="text" required placeholder="e.g. Jordan Taylor"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Division / Grade</label>
+                <input id="editAthleteDiv" type="text" required placeholder="e.g. 8th Grade, 7th Grade, Varsity"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Primary Event Group</label>
+                <select id="editAthleteGroup" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500">
+                  <option value="Sprints">Sprints</option>
+                  <option value="Distance">Distance</option>
+                  <option value="Hurdles">Hurdles</option>
+                  <option value="Jumps">Jumps</option>
+                  <option value="Throws">Throws</option>
+                  <option value="Multi">Multi / Relays</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Status</label>
+                <select id="editAthleteStatus" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-rose-500">
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button type="submit" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2.5 rounded-xl text-sm transition">Save Athlete</button>
+                <button type="button" onclick="resetRosterForm()" class="px-3 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-sm">Clear</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-bold text-white">Team Roster (${sorted.length})</h3>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr class="border-b border-slate-700 text-xs uppercase text-slate-400">
+                    <th class="py-2.5 px-3">Name</th>
+                    <th class="py-2.5 px-3">Division</th>
+                    <th class="py-2.5 px-3">Group</th>
+                    <th class="py-2.5 px-3">Status</th>
+                    <th class="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/60">
+                  ${sorted.map(a => `
+                    <tr class="hover:bg-slate-700/30">
+                      <td class="py-2.5 px-3 font-semibold text-white cursor-pointer hover:text-amber-400" onclick="openAthleteCardModal('${a.Name.replace(/'/g, "\\'")}')">${a.Name}</td>
+                      <td class="py-2.5 px-3 text-slate-300">${a.Division}</td>
+                      <td class="py-2.5 px-3 text-slate-400">${a.Event_Group}</td>
+                      <td class="py-2.5 px-3">
+                        <span class="px-2 py-0.5 rounded-md text-xs font-semibold ${a.Status === 'Active' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700 text-slate-400'}">${a.Status}</span>
+                      </td>
+                      <td class="py-2.5 px-3 text-right space-x-2">
+                        <button onclick="editRosterAthlete('${a.Athlete_ID}')" class="text-xs text-amber-400 hover:underline">Edit</button>
+                        <button onclick="removeRosterAthlete('${a.Athlete_ID}')" class="text-xs text-rose-400 hover:underline">Delete</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function editRosterAthlete(id) {
+      const ath = appData.athletes.find(a => a.Athlete_ID === id);
+      if (!ath) return;
+      document.getElementById('editAthleteId').value = ath.Athlete_ID;
+      document.getElementById('editAthleteName').value = ath.Name;
+      document.getElementById('editAthleteDiv').value = ath.Division;
+      document.getElementById('editAthleteGroup').value = ath.Event_Group;
+      document.getElementById('editAthleteStatus').value = ath.Status;
+      document.getElementById('rosterFormTitle').textContent = 'Edit Athlete';
+    }
+
+    function resetRosterForm() {
+      document.getElementById('editAthleteId').value = '';
+      document.getElementById('editAthleteName').value = '';
+      document.getElementById('editAthleteDiv').value = '';
+      document.getElementById('editAthleteGroup').value = 'Sprints';
+      document.getElementById('editAthleteStatus').value = 'Active';
+      document.getElementById('rosterFormTitle').textContent = 'Add / Edit Athlete';
+    }
+
+    async function saveRosterAthlete(e) {
+      e.preventDefault();
+      const athlete = {
+        Athlete_ID: document.getElementById('editAthleteId').value || null,
+        Name: document.getElementById('editAthleteName').value.trim(),
+        Division: document.getElementById('editAthleteDiv').value.trim(),
+        Event_Group: document.getElementById('editAthleteGroup').value,
+        Status: document.getElementById('editAthleteStatus').value
+      };
+      await StorageAdapter.saveAthlete(athlete);
+      appData = await StorageAdapter.getAllData();
+      refreshAthleteDropdowns();
+      renderRosterView();
+    }
+
+    async function removeRosterAthlete(id) {
+      if (!confirm('Remove this athlete from the roster? Existing meet logs will remain intact.')) return;
+      await StorageAdapter.deleteAthlete(id);
+      appData = await StorageAdapter.getAllData();
+      refreshAthleteDropdowns();
+      renderRosterView();
+    }
+
+    function renderBatchEntryView() {
+      const container = document.getElementById('coachSubView');
+      const today = new Date().toISOString().slice(0, 10);
+      const activeAthletes = [...appData.athletes]
+        .filter(a => a.Status === 'Active')
+        .sort((a, b) => a.Name.localeCompare(b.Name));
+
+      container.innerHTML = `
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-5">
+          <div>
+            <h2 class="text-xl font-bold text-white">Coach Batch Meet Entry</h2>
+            <p class="text-xs text-slate-400">Enter marks for multiple athletes in one event and submit all at once.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-slate-900 p-4 rounded-xl border border-slate-700">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Date</label>
+              <input id="batchDate" type="date" value="${today}" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Meet / Session Name</label>
+              <input id="batchMeetName" type="text" value="League Meet" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Category</label>
+              <select id="batchCat" onchange="populateEventDropdown('batchCat', 'batchEvent')" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Event</label>
+              <select id="batchEvent" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Type</label>
+              <select id="batchOfficial" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                <option value="true">Official Meet</option>
+                <option value="false">Practice</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="space-y-2 max-h-96 overflow-y-auto pr-1">
+            ${activeAthletes.map(a => `
+              <div class="flex items-center justify-between gap-3 bg-slate-900/70 border border-slate-700/70 rounded-xl px-4 py-2.5">
+                <div>
+                  <span class="font-semibold text-sm text-white">${a.Name}</span>
+                  <span class="text-xs text-slate-400 ml-2">${a.Division} &bull; ${a.Event_Group}</span>
+                </div>
+                <input type="text" data-athlete-id="${a.Athlete_ID}" placeholder="Blank to skip"
+                  class="batch-mark-input w-40 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-mono text-white focus:border-rose-500" />
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="flex justify-end">
+            <button onclick="submitBatchLogs()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-6 py-3 rounded-xl transition">Save All Entered Marks</button>
+          </div>
+        </div>
+      `;
+
+      populateCategoryDropdown('batchCat');
+      populateEventDropdown('batchCat', 'batchEvent');
+    }
+
+    async function submitBatchLogs() {
+      const dateStr = document.getElementById('batchDate').value;
+      const meetName = document.getElementById('batchMeetName').value.trim() || 'Official Meet';
+      const category = document.getElementById('batchCat').value;
+      const eventName = document.getElementById('batchEvent').value;
+      const isOfficial = document.getElementById('batchOfficial').value === 'true';
+
+      const inputs = document.querySelectorAll('.batch-mark-input');
+      const toAdd = [];
+
+      for (const inp of inputs) {
+        const val = inp.value.trim();
+        if (!val) continue;
+        const parsed = parseMarkInput(val, eventName);
+        if (!parsed) return alert(`Invalid mark "${val}" for ${eventName}.`);
+
+        const ath = appData.athletes.find(a => a.Athlete_ID === inp.dataset.athleteId);
+        if (!ath) continue;
+
+        toAdd.push({
+          Date: dateStr,
+          Meet_Name: meetName,
+          Athlete_ID: ath.Athlete_ID,
+          Athlete_Name: ath.Name,
+          Division: ath.Division,
+          Category: category,
+          Event: eventName,
+          Raw_Mark: parsed.rawFormatted,
+          Numeric_Value: parsed.numericValue,
+          Is_Official: isOfficial,
+          Entered_By: 'Coach'
+        });
+      }
+
+      if (toAdd.length === 0) return alert('Enter at least one mark before saving.');
+
+      await StorageAdapter.addLogs(toAdd);
+      appData = await StorageAdapter.getAllData();
+      alert(`Saved ${toAdd.length} marks for ${eventName}.`);
+      renderBatchEntryView();
+    }
+    /* ==========================================================================
+       6. COACH DASHBOARD — MEET LINEUP / RELAY BUILDER & SETTINGS
+       ========================================================================== */
+    let meetLineupRows = [];
+
+    function renderLineupBuilderView() {
+      const container = document.getElementById('coachSubView');
+      const allEvents = Object.values(EVENT_CATALOG).flat();
+      const activeAthletes = [...appData.athletes]
+        .filter(a => a.Status === 'Active')
+        .sort((a, b) => a.Name.localeCompare(b.Name));
+
+      container.innerHTML = `
+        <div class="space-y-6">
+          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4 no-print">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 class="text-xl font-bold text-white">Meet Lineup &amp; Relay Builder</h2>
+                <p class="text-xs text-slate-400">Assign athletes to events or relay legs with automatic seed PR lookup.</p>
+              </div>
+              <button onclick="window.print()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition">
+                Print Meet Sheet
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-900 p-4 rounded-xl border border-slate-700">
+              <select id="lineupEvent" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                ${allEvents.map(ev => `<option value="${ev}">${ev}</option>`).join('')}
+              </select>
+              <select id="lineupAthlete" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name} (${a.Division})</option>`).join('')}
+              </select>
+              <input id="lineupRole" type="text" placeholder="Role / Leg (e.g. Leg 1, Heat 2)"
+                class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+              <button onclick="addLineupEntry()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">
+                Add to Lineup
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 print-card">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+              <div>
+                <h3 class="text-lg font-bold text-white">${appData.settings.Program_Name || 'StatSlate Track & Field'} — Official Meet Lineup</h3>
+                <p class="text-xs text-slate-400">Generated ${new Date().toLocaleDateString()}</p>
+              </div>
+              <button onclick="clearLineup()" class="text-xs text-rose-400 hover:underline no-print">Clear Sheet</button>
+            </div>
+            <div id="lineupSheetBody"></div>
+          </div>
+        </div>
+      `;
+
+      renderLineupTable();
+    }
+
+    function addLineupEntry() {
+      const eventName = document.getElementById('lineupEvent').value;
+      const athId = document.getElementById('lineupAthlete').value;
+      const role = document.getElementById('lineupRole').value.trim() || 'Open Entry';
+      const ath = appData.athletes.find(a => a.Athlete_ID === athId);
+      if (!ath) return;
+
+      const board = StatsEngine.buildEventLeaderboard(appData.logs, eventName, 'ALL', 'ALL');
+      const match = board.find(b => b.athleteName === ath.Name);
+      const seedMark = match ? match.prMark : 'NT / NM';
+
+      meetLineupRows.push({
+        id: Date.now(),
+        event: eventName,
+        athleteName: ath.Name,
+        division: ath.Division,
+        role,
+        seedMark
+      });
+
+      document.getElementById('lineupRole').value = '';
+      renderLineupTable();
+    }
+
+    function removeLineupEntry(id) {
+      meetLineupRows = meetLineupRows.filter(r => r.id !== id);
+      renderLineupTable();
+    }
+
+    function clearLineup() {
+      meetLineupRows = [];
+      renderLineupTable();
+    }
+
+    function renderLineupTable() {
+      const target = document.getElementById('lineupSheetBody');
+      if (!target) return;
+
+      if (meetLineupRows.length === 0) {
+        target.innerHTML = `<p class="text-sm text-slate-400 py-6 text-center">No entries added yet. Use the form above to build your meet lineup or relay order.</p>`;
+        return;
+      }
+
+      target.innerHTML = `
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="border-b border-slate-700 text-xs uppercase text-slate-400">
+              <th class="py-2 px-3">Event</th>
+              <th class="py-2 px-3">Athlete</th>
+              <th class="py-2 px-3">Division</th>
+              <th class="py-2 px-3">Leg / Assignment</th>
+              <th class="py-2 px-3">Seed PR</th>
+              <th class="py-2 px-3 text-right no-print">Remove</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700/60">
+            ${meetLineupRows.map(r => `
+              <tr>
+                <td class="py-2.5 px-3 font-semibold text-white">${r.event}</td>
+                <td class="py-2.5 px-3 text-slate-200">${r.athleteName}</td>
+                <td class="py-2.5 px-3 text-slate-400 text-xs">${r.division}</td>
+                <td class="py-2.5 px-3 text-amber-400 font-medium">${r.role}</td>
+                <td class="py-2.5 px-3 font-mono font-bold text-white">${r.seedMark}</td>
+                <td class="py-2.5 px-3 text-right no-print">
+                  <button onclick="removeLineupEntry(${r.id})" class="text-xs text-rose-400 hover:underline">Remove</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderSettingsView() {
+      const container = document.getElementById('coachSubView');
+      const s = appData.settings;
+
+      container.innerHTML = `
+        <div class="max-w-xl bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4">
+          <h2 class="text-xl font-bold text-white">Program &amp; Access Settings</h2>
+          <form onsubmit="saveProgramSettings(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Program Display Name</label>
+              <input id="setProgramName" type="text" value="${s.Program_Name || ''}" required
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white" />
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Athlete Team Code</label>
+                <input id="setTeamCode" type="text" value="${s.Team_Code || ''}" required
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white uppercase" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Coach PIN</label>
+                <input id="setCoachPin" type="text" value="${s.Coach_PIN || ''}" required
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white" />
+              </div>
+            </div>
+            <button type="submit" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition">
+              Save Settings
+            </button>
+          </form>
+        </div>
+      `;
+    }
+
+    async function saveProgramSettings(e) {
+      e.preventDefault();
+      await StorageAdapter.updateSettings({
+        Program_Name: document.getElementById('setProgramName').value.trim(),
+        Team_Code: document.getElementById('setTeamCode').value.trim().toUpperCase(),
+        Coach_PIN: document.getElementById('setCoachPin').value.trim()
+      });
+      appData = await StorageAdapter.getAllData();
+      document.getElementById('headerProgramName').textContent = appData.settings.Program_Name;
+      alert('Program settings updated.');
+    }
+    /* ==========================================================================
+       7. PRINTABLE MLB-STYLE ATHLETE CARD (PNG EXPORT) & RAW DATA EDITOR MODAL
+       ========================================================================== */
+    function closeModals() {
+      document.getElementById('modalsRoot').innerHTML = '';
+    }
+
+    function openAthleteCardModal(athleteName) {
+      const athlete = appData.athletes.find(a => a.Name === athleteName) || {
+        Name: athleteName,
+        Division: 'Unassigned',
+        Event_Group: 'Track & Field'
+      };
+      const profile = StatsEngine.getAthleteProfile(athlete, appData.logs);
+
+      document.getElementById('modalsRoot').innerHTML = `
+        <div class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div class="max-w-2xl w-full space-y-3 my-auto">
+            <div class="flex items-center justify-between bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 no-print">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Athlete Performance Card</span>
+              <div class="flex items-center gap-2">
+                <button onclick="downloadCardPng('${athlete.Name.replace(/'/g, "\\'")}')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition">Export PNG</button>
+                <button onclick="window.print()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition">Print Card</button>
+                <button onclick="closeModals()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs">Close</button>
+              </div>
+            </div>
+
+            <div id="athleteReportCard" class="print-card bg-slate-900 border-2 border-rose-600/80 rounded-2xl overflow-hidden shadow-2xl">
+              <div class="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 px-6 py-5 flex items-center justify-between">
+                <div>
+                  <p class="text-[11px] font-bold uppercase tracking-widest text-rose-100">${appData.settings.Program_Name || 'StatSlate Track & Field'}</p>
+                  <h2 class="text-2xl font-black tracking-tight text-white mt-0.5">${athlete.Name}</h2>
+                  <p class="text-xs font-semibold text-amber-100 mt-1">${athlete.Division} &bull; ${athlete.Event_Group}</p>
+                </div>
+                <div class="text-right bg-slate-950/30 border border-white/20 rounded-xl px-4 py-2">
+                  <span class="block text-[10px] uppercase tracking-wider text-rose-100">Logged Marks</span>
+                  <span class="text-2xl font-black font-mono text-white">${profile.totalEntries}</span>
+                </div>
+              </div>
+
+              <div class="p-6 space-y-5">
+                <div>
+                  <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2.5">Personal Records (Season Best)</h3>
+                  ${profile.events.length === 0
+                    ? `<p class="text-sm text-slate-400">No marks recorded yet.</p>`
+                    : `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        ${profile.events.map(ev => `
+                          <div class="bg-slate-800 border border-slate-700 rounded-xl p-3">
+                            <span class="block text-xs font-semibold text-slate-400">${ev.event}</span>
+                            <span class="block text-xl font-black font-mono text-amber-400 mt-0.5">${ev.prMark}</span>
+                            <span class="block text-[10px] text-slate-500 mt-1">${ev.prMeet} (${ev.prDate})</span>
+                          </div>
+                        `).join('')}
+                      </div>`
+                  }
+                </div>
+
+                <div>
+                  <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Recent Mark Log</h3>
+                  <div class="border border-slate-700 rounded-xl overflow-hidden">
+                    <table class="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr class="bg-slate-800 border-b border-slate-700 text-slate-400 uppercase">
+                          <th class="py-2 px-3">Date</th>
+                          <th class="py-2 px-3">Event</th>
+                          <th class="py-2 px-3">Meet</th>
+                          <th class="py-2 px-3 text-right">Mark</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-800">
+                        ${profile.recentLogs.slice(0, 8).map(l => `
+                          <tr>
+                            <td class="py-2 px-3 text-slate-400">${l.Date}</td>
+                            <td class="py-2 px-3 font-semibold text-white">${l.Event}</td>
+                            <td class="py-2 px-3 text-slate-300">${l.Meet_Name}</td>
+                            <td class="py-2 px-3 text-right font-mono font-bold text-amber-400">${l.Raw_Mark}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function downloadCardPng(athleteName) {
+      const cardEl = document.getElementById('athleteReportCard');
+      if (!cardEl || typeof html2canvas === 'undefined') return;
+      const canvas = await html2canvas(cardEl, { backgroundColor: '#0f172a', scale: 2 });
+      const link = document.createElement('a');
+      link.download = `${athleteName.replace(/\s+/g, '_')}_StatSlate_Card.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function openRawDataModal() {
+      if (sessionStorage.getItem('statslate_tf_coach_unlocked') !== 'true') {
+        alert('Unlock the Coach Dashboard with your Coach PIN first to manage raw data.');
+        switchTab('coach');
+        return;
+      }
+
+      document.getElementById('modalsRoot').innerHTML = `
+        <div class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="p-5 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-bold text-white">Raw Meet Data &amp; Cloud Backup</h2>
+                <p class="text-xs text-slate-400">Edit marks, delete entries, or export/import JSON snapshots.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button onclick="exportJsonBackup()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-3 py-2 rounded-lg">Export JSON</button>
+                <label class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer">
+                  Import JSON
+                  <input type="file" accept=".json" onchange="importJsonBackup(event)" class="hidden" />
+                </label>
+                <button onclick="closeModals()" class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-3 py-2 rounded-lg">Close</button>
+              </div>
+            </div>
+
+            <div class="p-4 border-b border-slate-700 bg-slate-900/50">
+              <input id="rawSearchInput" type="text" oninput="renderRawLogsTable()" placeholder="Search by athlete, event, meet name, or date..."
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:border-rose-500" />
+            </div>
+
+            <div id="rawLogsTableWrap" class="flex-1 overflow-auto p-4"></div>
+          </div>
+        </div>
+      `;
+
+      renderRawLogsTable();
+    }
+
+    function renderRawLogsTable() {
+      const wrap = document.getElementById('rawLogsTableWrap');
+      if (!wrap) return;
+      const q = (document.getElementById('rawSearchInput')?.value || '').toLowerCase();
+
+      const filtered = [...appData.logs]
+        .reverse()
+        .filter(l =>
+          l.Athlete_Name.toLowerCase().includes(q) ||
+          l.Event.toLowerCase().includes(q) ||
+          l.Meet_Name.toLowerCase().includes(q) ||
+          l.Date.includes(q)
+        );
+
+      wrap.innerHTML = `
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="border-b border-slate-700 text-slate-400 uppercase">
+              <th class="py-2 px-2">Date</th>
+              <th class="py-2 px-2">Athlete</th>
+              <th class="py-2 px-2">Event</th>
+              <th class="py-2 px-2">Meet</th>
+              <th class="py-2 px-2">Mark</th>
+              <th class="py-2 px-2">Type</th>
+              <th class="py-2 px-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700/60">
+            ${filtered.map(l => `
+              <tr class="hover:bg-slate-700/30">
+                <td class="py-2 px-2 text-slate-400">${l.Date}</td>
+                <td class="py-2 px-2 font-semibold text-white">${l.Athlete_Name}</td>
+                <td class="py-2 px-2 text-slate-300">${l.Event}</td>
+                <td class="py-2 px-2 text-slate-400">${l.Meet_Name}</td>
+                <td class="py-2 px-2 font-mono font-bold text-amber-400">${l.Raw_Mark}</td>
+                <td class="py-2 px-2">${l.Is_Official ? 'Official' : 'Practice'}</td>
+                <td class="py-2 px-2 text-right space-x-2">
+                  <button onclick="promptEditRawLog('${l.Log_ID}')" class="text-amber-400 hover:underline">Edit</button>
+                  <button onclick="deleteRawLog('${l.Log_ID}')" class="text-rose-400 hover:underline">Delete</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function promptEditRawLog(logId) {
+      const log = appData.logs.find(l => l.Log_ID === logId);
+      if (!log) return;
+
+      const newMark = prompt(`Edit mark for ${log.Athlete_Name} (${log.Event}):`, log.Raw_Mark);
+      if (newMark === null) return;
+      const parsed = parseMarkInput(newMark, log.Event);
+      if (!parsed) return alert('Invalid mark format.');
+
+      const newMeet = prompt('Edit Meet Name:', log.Meet_Name);
+      if (newMeet === null) return;
+
+      await StorageAdapter.updateLog({
+        ...log,
+        Raw_Mark: parsed.rawFormatted,
+        Numeric_Value: parsed.numericValue,
+        Meet_Name: newMeet.trim() || log.Meet_Name
+      });
+
+      appData = await StorageAdapter.getAllData();
+      renderRawLogsTable();
+      if (currentCoachSubTab === 'leaderboard') renderLeaderboardView();
+    }
+
+    async function deleteRawLog(logId) {
+      if (!confirm('Permanently delete this log entry?')) return;
+      await StorageAdapter.deleteLog(logId);
+      appData = await StorageAdapter.getAllData();
+      renderRawLogsTable();
+      if (currentCoachSubTab === 'leaderboard') renderLeaderboardView();
+    }
+
+    function exportJsonBackup() {
+      const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `StatSlate_TrackField_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJsonBackup(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          if (!parsed.athletes || !parsed.logs) throw new Error('Invalid backup structure.');
+          await StorageAdapter.replaceAll(parsed);
+          appData = await StorageAdapter.getAllData();
+          refreshAthleteDropdowns();
+          renderRawLogsTable();
+          alert('Backup restored successfully.');
+        } catch (err) {
+          alert('Failed to import JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
