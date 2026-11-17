@@ -852,7 +852,7 @@
       /* ==========================================================================
        4B. COACH DASHBOARD — LIVE SPLITS STOPWATCH (UP TO 8 ATHLETES)
        ========================================================================== */
-    let swState = {
+      let swState = {
       running: false,
       startTime: 0,
       elapsedMs: 0,
@@ -860,9 +860,10 @@
       event: '800m',
       sessionName: 'Track Splits',
       isOfficial: false,
-      racers: [] // { id, name, division, lane, splits: [{ lap, splitMs, totalMs }], finished: false }
+      setupCollapsed: false,
+      racers: []
     };
-
+    
     function formatStopwatchMs(ms) {
       const totalHundredths = Math.floor(ms / 10);
       const hundredths = totalHundredths % 100;
@@ -887,42 +888,49 @@
         .sort((a, b) => a.Name.localeCompare(b.Name));
 
       container.innerHTML = `
-        <div class="space-y-5">
-          <!-- TOP CLOCK BAR -->
-          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
-            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div class="text-center md:text-left">
-                <span class="text-xs font-bold uppercase tracking-widest text-rose-400">Live Race Timer</span>
-                <div id="swClockDisplay" class="text-5xl sm:text-6xl font-black font-mono tracking-tight text-white mt-1">
+        <div class="space-y-3">
+          <!-- COMPACT STICKY CLOCK BAR -->
+          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 sm:p-5 shadow-xl sticky top-16 z-20">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div class="text-center sm:text-left">
+                <div class="flex items-center justify-center sm:justify-start gap-2">
+                  <span class="text-[11px] font-bold uppercase tracking-widest text-rose-400">${swState.event}</span>
+                  <span class="text-xs text-slate-400">&bull; ${swState.sessionName || 'Live Splits'}</span>
+                </div>
+                <div id="swClockDisplay" class="text-4xl sm:text-6xl font-black font-mono tracking-tight text-white">
                   ${formatStopwatchMs(swState.elapsedMs)}
                 </div>
               </div>
 
-              <div class="flex flex-wrap items-center justify-center gap-2.5">
+              <div class="flex flex-wrap items-center justify-center gap-2">
                 <button id="swStartPauseBtn" onclick="toggleStopwatch()"
-                  class="px-6 py-3.5 rounded-xl font-bold text-base transition shadow-lg ${
+                  class="px-5 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition shadow-lg ${
                     swState.running
                       ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
                       : 'bg-emerald-600 hover:bg-emerald-500 text-white'
                   }">
-                  ${swState.running ? 'Pause Clock' : (swState.elapsedMs > 0 ? 'Resume' : 'Start Race')}
+                  ${swState.running ? 'Pause' : (swState.elapsedMs > 0 ? 'Resume' : 'Start Race')}
                 </button>
                 <button onclick="resetStopwatch()"
-                  class="px-4 py-3.5 rounded-xl font-semibold text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 transition">
+                  class="px-3.5 py-2.5 sm:py-3 rounded-xl font-semibold text-xs sm:text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 transition">
                   Reset
                 </button>
                 <button onclick="saveStopwatchToProfiles()"
-                  class="px-5 py-3.5 rounded-xl font-bold text-sm bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/30 transition">
-                  Save Splits to Profiles
+                  class="px-4 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/30 transition">
+                  Save Splits
+                </button>
+                <button type="button" onclick="toggleStopwatchSetup()"
+                  class="px-3 py-2.5 sm:py-3 rounded-xl font-semibold text-xs bg-slate-900 border border-slate-700 text-amber-400 hover:border-amber-500 transition">
+                  ${swState.setupCollapsed ? 'Edit Setup (' + swState.racers.length + ')' : 'Set Racers'}
                 </button>
               </div>
             </div>
 
-            <!-- RACE CONFIG BAR -->
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-700">
+            <!-- COLLAPSIBLE RACE CONFIG BAR -->
+            <div class="${swState.setupCollapsed ? 'hidden' : 'grid'} grid-cols-1 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-slate-700">
               <div>
                 <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Race / Relay Event</label>
-                <select id="swEventSelect" onchange="swState.event = this.value"
+                <select id="swEventSelect" onchange="swState.event = this.value; renderStopwatchView();"
                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
                   ${trackEvents.map(ev => `<option value="${ev}" ${ev === swState.event ? 'selected' : ''}>${ev}</option>`).join('')}
                 </select>
@@ -956,18 +964,27 @@
           </div>
 
           <!-- ACTIVE RACERS LIST -->
-          <div id="swRacersList" class="space-y-3"></div>
+          <div id="swRacersList" class="space-y-2.5"></div>
         </div>
       `;
 
       renderStopwatchRacers();
     }
+
         function updateStopwatchTick() {
       if (!swState.running) return;
       swState.elapsedMs = performance.now() - swState.startTime;
       const display = document.getElementById('swClockDisplay');
       if (display) display.textContent = formatStopwatchMs(swState.elapsedMs);
       swState.rafId = requestAnimationFrame(updateStopwatchTick);
+    }
+
+    function toggleStopwatchSetup() {
+      if (!swState.setupCollapsed && swState.racers.length === 0) {
+        return alert('Add at least one athlete first.');
+      }
+      swState.setupCollapsed = !swState.setupCollapsed;
+      renderStopwatchView();
     }
 
     function toggleStopwatch() {
@@ -979,6 +996,7 @@
           return alert('Add at least one athlete to the race before starting the clock.');
         }
         swState.running = true;
+        swState.setupCollapsed = true;
         swState.startTime = performance.now() - swState.elapsedMs;
         swState.rafId = requestAnimationFrame(updateStopwatchTick);
       }
@@ -991,6 +1009,7 @@
       cancelAnimationFrame(swState.rafId);
       swState.elapsedMs = 0;
       swState.racers = [];
+      swState.setupCollapsed = false;
       renderStopwatchView();
     }
 
