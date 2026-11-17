@@ -1706,7 +1706,7 @@
       }
 
       // Group rows by event
-      const grouped = {};
+        const grouped = {};
       meetLineupRows.forEach(r => {
         if (!grouped[r.event]) grouped[r.event] = [];
         grouped[r.event].push(r);
@@ -1719,16 +1719,12 @@
         return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
       });
 
-      // Build the sorted result object or render the grouped events
-        const result = {};
+        const meetLineupRows = [];
         sortedEvents.forEach((event) => {
-      // Optional: Sort athletes/results within each event by mark/time
-        grouped[event].sort((a, b) => a.numericMark - b.numericMark);
-        result[event] = grouped[event];
+        grouped[event].forEach((row) => {
+          meetLineupRows.push(row);
+        });
       });
-
-      return result;
-    }
 
       target.innerHTML = `
         <table class="w-full text-left border-collapse text-sm">
