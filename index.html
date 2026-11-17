@@ -79,11 +79,11 @@
               </div>
             </div>
             <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Result / Mark</label>
-              <input id="athMarkInput" type="text" placeholder="e.g. 12.45 or 2:14.30" required
-                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-lg font-mono focus:outline-none focus:border-rose-500" />
-              <p class="text-xs text-slate-400 mt-1">Track: seconds (12.45) or min:sec (2:14.30). Field: feet-inches (18-04.5) or meters (5.60m).</p>
+              <label id="athMarkLabel" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Result / Mark</label>
+              <div id="athDynamicMarkInputs"></div>
+              <p id="athMarkHint" class="text-xs text-slate-400 mt-1.5"></p>
             </div>
+
             <div>
               <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Session Type</label>
               <div class="grid grid-cols-2 gap-3">
@@ -514,30 +514,119 @@
       refreshAthleteDropdowns();
     }
 
+    const LONG_TRACK_EVENTS = new Set([
+      '800m', '1600m', '3200m',
+      '4x200m Relay', '4x400m Relay', '4x800m Relay'
+    ]);
+
+    function getEnabledEventsList() {
+      const all = Object.values(EVENT_CATALOG).flat();
+      if (!Array.isArray(appData.settings.Enabled_Events) || appData.settings.Enabled_Events.length === 0) {
+        return all;
+      }
+      return all.filter(ev => appData.settings.Enabled_Events.includes(ev));
+    }
+
     function populateCategoryDropdown(selectId) {
       const sel = document.getElementById(selectId);
       if (!sel) return;
-      sel.innerHTML = Object.keys(EVENT_CATALOG)
-        .map(cat => `<option value="${cat}">${cat}</option>`)
-        .join('');
+      const enabled = new Set(getEnabledEventsList());
+      const activeCats = Object.keys(EVENT_CATALOG).filter(cat =>
+        EVENT_CATALOG[cat].some(ev => enabled.has(ev))
+      );
+      sel.innerHTML = activeCats.map(cat => `<option value="${cat}">${cat}</option>`).join('');
     }
 
     function populateEventDropdown(catSelectId, eventSelectId) {
-      const cat = document.getElementById(catSelectId)?.value || 'Sprints';
+      const cat = document.getElementById(catSelectId)?.value;
       const evSel = document.getElementById(eventSelectId);
       if (!evSel) return;
-      const events = EVENT_CATALOG[cat] || [];
+      const enabled = new Set(getEnabledEventsList());
+      const events = (EVENT_CATALOG[cat] || []).filter(ev => enabled.has(ev));
       evSel.innerHTML = events.map(ev => `<option value="${ev}">${ev}</option>`).join('');
-      updateMarkPlaceholder();
+      if (eventSelectId === 'athEventSelect') updateMarkPlaceholder();
     }
 
     function updateMarkPlaceholder() {
       const ev = document.getElementById('athEventSelect')?.value || '';
-      const input = document.getElementById('athMarkInput');
-      if (!input) return;
-      input.placeholder = isFieldEvent(ev)
-        ? 'e.g. 18-04.5 or 5.60m'
-        : 'e.g. 12.45 or 2:14.30';
+      const container = document.getElementById('athDynamicMarkInputs');
+      const hint = document.getElementById('athMarkHint');
+      if (!container) return;
+
+      if (isFieldEvent(ev)) {
+        container.innerHTML = `
+          <div class="grid grid-cols-2 gap-3">
+            <div class="relative">
+              <input id="athFieldFeet" type="number" min="0" max="400" step="1" placeholder="0" required
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-12 py-3 text-white text-lg font-mono focus:outline-none focus:border-rose-500" />
+              <span class="absolute right-4 top-3.5 text-xs font-bold uppercase text-slate-400">ft</span>
+            </div>
+            <div class="relative">
+              <input id="athFieldInches" type="number" min="0" max="11.99" step="0.01" placeholder="0.0"
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-12 py-3 text-white text-lg font-mono focus:outline-none focus:border-rose-500" />
+              <span class="absolute right-4 top-3.5 text-xs font-bold uppercase text-slate-400">in</span>
+            </div>
+          </div>`;
+        hint.textContent = 'Enter feet (required) and inches/fractional inches (leave inches blank or 0 for exact feet).';
+      } else if (LONG_TRACK_EVENTS.has(ev)) {
+        container.innerHTML = `
+          <div class="grid grid-cols-2 gap-3">
+            <div class="relative">
+              <input id="athTrackMins" type="number" min="0" max="59" step="1" placeholder="0"
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-14 py-3 text-white text-lg font-mono focus:outline-none focus:border-rose-500" />
+              <span class="absolute right-4 top-3.5 text-xs font-bold uppercase text-slate-400">min</span>
+            </div>
+            <div class="relative">
+              <input id="athTrackSecs" type="number" min="0" max="59.99" step="0.01" placeholder="00.00" required
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-14 py-3 text-white text-lg font-mono focus:outline-none focus:border-rose-500" />
+              <span class="absolute right-4 top-3.5 text-xs font-bold uppercase text-slate-400">sec</span>
+            </div>
+          </div>`;
+        hint.textContent = 'Enter minutes (leave blank if under 1 minute) and seconds with hundredths.';
+      } else {
+        container.innerHTML = `
+          <div class="relative">
+            <input id="athTrackSecs" type="number" min="1" max="180" step="0.01" placeholder="12.45" required
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-14 py-3 text-white text-lg font-mono focus:outline-none focus:border-rose-500" />
+            <span class="absolute right-4 top-3.5 text-xs font-bold uppercase text-slate-400">sec</span>
+          </div>`;
+        hint.textContent = 'Enter total seconds with hundredths (e.g. 12.45).';
+      }
+    }
+
+    function readStructuredAthleteMark(eventName) {
+      if (isFieldEvent(eventName)) {
+        const ft = parseInt(document.getElementById('athFieldFeet')?.value, 10);
+        const rawIn = document.getElementById('athFieldInches')?.value;
+        const inches = rawIn === '' || rawIn === undefined ? 0 : parseFloat(rawIn);
+        if (isNaN(ft) || ft < 0 || isNaN(inches) || inches < 0 || inches >= 12) return null;
+        const totalInches = (ft * 12) + inches;
+        if (totalInches <= 0) return null;
+        const inchDisplay = inches === 0 ? '00' : (inches < 10 ? `0${inches}` : `${inches}`);
+        return {
+          rawFormatted: `${ft}-${inchDisplay}`,
+          numericValue: Number(totalInches.toFixed(3))
+        };
+      } else if (LONG_TRACK_EVENTS.has(eventName)) {
+        const rawMin = document.getElementById('athTrackMins')?.value;
+        const mins = rawMin === '' || rawMin === undefined ? 0 : parseInt(rawMin, 10);
+        const secs = parseFloat(document.getElementById('athTrackSecs')?.value);
+        if (isNaN(mins) || mins < 0 || isNaN(secs) || secs < 0 || secs >= 60) return null;
+        const totalSeconds = (mins * 60) + secs;
+        if (totalSeconds <= 0) return null;
+        const secStr = secs < 10 ? `0${secs.toFixed(2)}` : secs.toFixed(2);
+        return {
+          rawFormatted: mins > 0 ? `${mins}:${secStr}` : secs.toFixed(2),
+          numericValue: Number(totalSeconds.toFixed(3))
+        };
+      } else {
+        const secs = parseFloat(document.getElementById('athTrackSecs')?.value);
+        if (isNaN(secs) || secs <= 0) return null;
+        return {
+          rawFormatted: secs.toFixed(2),
+          numericValue: Number(secs.toFixed(3))
+        };
+      }
     }
 
     function refreshAthleteDropdowns() {
@@ -560,17 +649,16 @@
 
       const category = document.getElementById('athCategorySelect').value;
       const eventName = document.getElementById('athEventSelect').value;
-      const rawInput = document.getElementById('athMarkInput').value;
-      const parsed = parseMarkInput(rawInput, eventName);
+      const parsed = readStructuredAthleteMark(eventName);
 
       if (!parsed) {
-        return alert('Invalid mark format. Use seconds (12.45), min:sec (2:14.30), feet-inches (18-04.5), or meters (5.60m).');
+        return alert('Please enter a valid mark (inches must be under 12, seconds under 60).');
       }
 
       const isOfficial = document.querySelector('input[name="athOfficial"]:checked').value === 'true';
       const today = new Date().toISOString().slice(0, 10);
 
-      const newEntry = {
+      const [saved] = await StorageAdapter.addLogs([{
         Date: today,
         Meet_Name: isOfficial ? 'Official Meet' : 'Practice',
         Athlete_ID: athlete.Athlete_ID,
@@ -582,16 +670,14 @@
         Numeric_Value: parsed.numericValue,
         Is_Official: isOfficial,
         Entered_By: 'Athlete'
-      };
+      }]);
 
-      const [saved] = await StorageAdapter.addLogs([newEntry]);
       appData = await StorageAdapter.getAllData();
-
       sessionReceipts.unshift(saved);
       renderSessionReceipts();
-
-      document.getElementById('athMarkInput').value = '';
+      updateMarkPlaceholder();
     }
+
 
     function renderSessionReceipts() {
       const box = document.getElementById('sessionReceiptsContainer');
@@ -686,7 +772,7 @@
 
     function renderLeaderboardView() {
       const container = document.getElementById('coachSubView');
-      const allEvents = Object.values(EVENT_CATALOG).flat();
+      const allEvents = getEnabledEventsList();
       const divisions = ['ALL', ...new Set(appData.athletes.map(a => a.Division).filter(Boolean))];
 
       container.innerHTML = `
@@ -1001,7 +1087,7 @@
 
     function renderLineupBuilderView() {
       const container = document.getElementById('coachSubView');
-      const allEvents = Object.values(EVENT_CATALOG).flat();
+      const allEvents = getEnabledEventsList();
       const activeAthletes = [...appData.athletes]
         .filter(a => a.Status === 'Active')
         .sort((a, b) => a.Name.localeCompare(b.Name));
@@ -1126,11 +1212,12 @@
     function renderSettingsView() {
       const container = document.getElementById('coachSubView');
       const s = appData.settings;
+      const enabledSet = new Set(getEnabledEventsList());
 
       container.innerHTML = `
-        <div class="max-w-xl bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4">
-          <h2 class="text-xl font-bold text-white">Program &amp; Access Settings</h2>
-          <form onsubmit="saveProgramSettings(event)" class="space-y-4">
+        <div class="max-w-3xl bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-6">
+          <h2 class="text-xl font-bold text-white">Program &amp; Active Event Settings</h2>
+          <form onsubmit="saveProgramSettings(event)" class="space-y-5">
             <div>
               <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Program Display Name</label>
               <input id="setProgramName" type="text" value="${s.Program_Name || ''}" required
@@ -1148,25 +1235,65 @@
                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white" />
               </div>
             </div>
-            <button type="submit" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition">
-              Save Settings
+
+            <div class="border-t border-slate-700 pt-4">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <h3 class="text-sm font-bold text-white">Competed Events (MS / HS Customization)</h3>
+                  <p class="text-xs text-slate-400">Unchecked events are hidden from athlete logging and coach dropdowns.</p>
+                </div>
+                <div class="space-x-2 text-xs">
+                  <button type="button" onclick="toggleAllEventBoxes(true)" class="text-amber-400 hover:underline">Select All</button>
+                  <button type="button" onclick="toggleAllEventBoxes(false)" class="text-slate-400 hover:underline">Clear</button>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                ${Object.entries(EVENT_CATALOG).map(([cat, events]) => `
+                  <div class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2">
+                    <p class="text-xs font-bold uppercase tracking-wider text-rose-400">${cat}</p>
+                    ${events.map(ev => `
+                      <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer">
+                        <input type="checkbox" value="${ev}" class="event-toggle-cb rounded bg-slate-800 border-slate-600 text-rose-600 focus:ring-rose-500"
+                          ${enabledSet.has(ev) ? 'checked' : ''} />
+                        <span>${ev}</span>
+                      </label>
+                    `).join('')}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <button type="submit" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition">
+              Save Program Settings
             </button>
           </form>
         </div>
       `;
     }
 
+    function toggleAllEventBoxes(checked) {
+      document.querySelectorAll('.event-toggle-cb').forEach(cb => cb.checked = checked);
+    }
+
     async function saveProgramSettings(e) {
       e.preventDefault();
+      const checkedEvents = Array.from(document.querySelectorAll('.event-toggle-cb:checked')).map(cb => cb.value);
+      if (checkedEvents.length === 0) return alert('Please select at least one event.');
+
       await StorageAdapter.updateSettings({
         Program_Name: document.getElementById('setProgramName').value.trim(),
         Team_Code: document.getElementById('setTeamCode').value.trim().toUpperCase(),
-        Coach_PIN: document.getElementById('setCoachPin').value.trim()
+        Coach_PIN: document.getElementById('setCoachPin').value.trim(),
+        Enabled_Events: checkedEvents
       });
+
       appData = await StorageAdapter.getAllData();
       document.getElementById('headerProgramName').textContent = appData.settings.Program_Name;
-      alert('Program settings updated.');
+      populateCategoryDropdown('athCategorySelect');
+      populateEventDropdown('athCategorySelect', 'athEventSelect');
+      alert('Settings and active event list saved.');
     }
+
     /* ==========================================================================
        7. PRINTABLE MLB-STYLE ATHLETE CARD (PNG EXPORT) & RAW DATA EDITOR MODAL
        ========================================================================== */
