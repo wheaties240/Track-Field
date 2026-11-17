@@ -453,7 +453,7 @@
        ========================================================================== */
     let appData = { settings: {}, athletes: [], logs: [] };
     let sessionReceipts = [];
-    let currentCoachSubTab = 'leaderboard';
+    let currentCoachSubTab = 'launcher';
 
     async function initApp() {
       appData = await StorageAdapter.getAllData();
@@ -726,6 +726,7 @@
     }
 
     function showCoachWorkspace() {
+      currentCoachSubTab = 'launcher';
       document.getElementById('coachGate').classList.add('hidden');
       document.getElementById('coachWorkspace').classList.remove('hidden');
       renderCoachWorkspace();
@@ -738,7 +739,6 @@
 
     function renderCoachWorkspace() {
       const ws = document.getElementById('coachWorkspace');
-
       const tools = [
         {
           id: 'leaderboard',
