@@ -732,34 +732,96 @@
     }
 
     function switchCoachSubTab(subTab) {
-      currentCoachSubTab = subTab;
-      renderCoachWorkspace();
-    }
+          let currentCoachSubTab = 'launcher';
 
     function renderCoachWorkspace() {
       const ws = document.getElementById('coachWorkspace');
-      const tabs = [
-        { id: 'leaderboard', label: 'Event Leaderboard' },
-        { id: 'stopwatch', label: 'Live Splits Stopwatch' },
-        { id: 'roster', label: 'Roster Manager' },
-        { id: 'batch', label: 'Batch Meet Entry' },
-        { id: 'lineup', label: 'Meet Lineup Builder' },
-        { id: 'settings', label: 'Program Settings' }
+
+      const tools = [
+        {
+          id: 'leaderboard',
+          title: 'Event Leaderboard',
+          desc: 'Season PRs, form arrows, and athlete report cards',
+          accent: 'text-amber-400 bg-amber-500/15 border-amber-500/30',
+          icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 21h8m-4-4v4m-4-8H6a2 2 0 01-2-2V5h4m8 8h2a2 2 0 002-2V5h-4M8 5h8v6a4 4 0 01-8 0V5z"/></svg>`
+        },
+        {
+          id: 'stopwatch',
+          title: 'Live Splits Stopwatch',
+          desc: 'Multi-lane lap timer with instant profile saving',
+          accent: 'text-rose-400 bg-rose-500/15 border-rose-500/30',
+          icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0zM9 2h6m-3 0v2"/></svg>`
+        },
+        {
+          id: 'lineup',
+          title: 'Meet Lineup Builder',
+          desc: 'Assign events by athlete and print official meet sheets',
+          accent: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30',
+          icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>`
+        },
+        {
+          id: 'batch',
+          title: 'Batch Meet Entry',
+          desc: 'Log results for an entire event in one submission',
+          accent: 'text-sky-400 bg-sky-500/15 border-sky-500/30',
+          icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h10m-10 4h6m8-2v6m-3-3h6"/></svg>`
+        },
+        {
+          id: 'roster',
+          title: 'Roster Manager',
+          desc: 'Manage active athletes, divisions, and event groups',
+          accent: 'text-purple-400 bg-purple-500/15 border-purple-500/30',
+          icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`
+        },
+        {
+          id: 'settings',
+          title: 'Program Settings',
+          desc: 'Toggle MS/HS events, team access code, and PIN',
+          accent: 'text-slate-300 bg-slate-700/50 border-slate-600',
+          icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`
+        }
       ];
 
-      ws.innerHTML = `
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 no-print">
-          <div class="flex flex-wrap gap-1.5">
-            ${tabs.map(t => `
-              <button onclick="switchCoachSubTab('${t.id}')"
-                class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
-                  currentCoachSubTab === t.id
-                    ? 'bg-rose-600 text-white shadow'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-700'
-                }">${t.label}</button>
-            `).join('')}
+      if (currentCoachSubTab === 'launcher') {
+        ws.innerHTML = `
+          <div class="space-y-4">
+            <div class="flex items-center justify-between px-1">
+              <div>
+                <h2 class="text-xl font-bold text-white">Coach Tools</h2>
+                <p class="text-xs text-slate-400">Select a coaching module below</p>
+              </div>
+              <button onclick="lockCoach()" class="text-xs text-slate-400 hover:text-rose-400 underline">Lock Dashboard</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              ${tools.map(t => `
+                <button onclick="switchCoachSubTab('${t.id}')"
+                  class="text-left bg-slate-800 hover:bg-slate-800/80 border border-slate-700 hover:border-rose-500/60 rounded-2xl p-5 transition group shadow-lg flex items-start gap-4">
+                  <div class="w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${t.accent} group-hover:scale-105 transition">
+                    ${t.icon}
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-white group-hover:text-amber-400 transition">${t.title}</h3>
+                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">${t.desc}</p>
+                  </div>
+                </button>
+              `).join('')}
+            </div>
           </div>
-          <button onclick="lockCoach()" class="text-xs text-slate-400 hover:text-rose-400 underline px-2">Lock Coach</button>
+        `;
+        return;
+      }
+
+      const activeTool = tools.find(t => t.id === currentCoachSubTab);
+
+      ws.innerHTML = `
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 no-print">
+          <button onclick="switchCoachSubTab('launcher')"
+            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-xs sm:text-sm font-semibold text-amber-400 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            All Coach Tools
+          </button>
+          <span class="text-sm font-bold text-white">${activeTool ? activeTool.title : ''}</span>
+          <button onclick="lockCoach()" class="text-xs text-slate-400 hover:text-rose-400 underline">Lock</button>
         </div>
         <div id="coachSubView"></div>
       `;
@@ -1436,39 +1498,103 @@
     /* ==========================================================================
        6. COACH DASHBOARD — MEET LINEUP / RELAY BUILDER & SETTINGS
        ========================================================================== */
+       const STANDARD_MEET_ORDER = [
+      'Long Jump', 'Triple Jump', 'High Jump', 'Pole Vault',
+      'Shot Put', 'Discus', 'Javelin',
+      '4x800m Relay',
+      '100m Hurdles', '110m Hurdles',
+      '60m', '100m',
+      '4x200m Relay',
+      '1600m',
+      '4x100m Relay',
+      '400m',
+      '300m Hurdles',
+      '800m',
+      '200m',
+      '3200m',
+      '4x400m Relay'
+    ];
+
     let meetLineupRows = [];
 
     function renderLineupBuilderView() {
       const container = document.getElementById('coachSubView');
-      const allEvents = getEnabledEventsList();
+      const enabledSet = new Set(getEnabledEventsList());
       const activeAthletes = [...appData.athletes]
         .filter(a => a.Status === 'Active')
         .sort((a, b) => a.Name.localeCompare(b.Name));
 
       container.innerHTML = `
         <div class="space-y-6">
-          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4 no-print">
-            <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-5 no-print">
+            <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 class="text-xl font-bold text-white">Meet Lineup &amp; Relay Builder</h2>
-                <p class="text-xs text-slate-400">Assign athletes to events or relay legs with automatic seed PR lookup.</p>
+                <p class="text-xs text-slate-400">Select an athlete, check all their events, and assign relay legs in one step.</p>
               </div>
               <button onclick="window.print()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition">
                 Print Meet Sheet
               </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-900 p-4 rounded-xl border border-slate-700">
-              <select id="lineupEvent" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-                ${allEvents.map(ev => `<option value="${ev}">${ev}</option>`).join('')}
-              </select>
-              <select id="lineupAthlete" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-                ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name} (${a.Division})</option>`).join('')}
-              </select>
-              <input id="lineupRole" type="text" placeholder="Role / Leg (e.g. Leg 1, Heat 2)"
-                class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
-              <button onclick="addLineupEntry()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">
-                Add to Lineup
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-700">
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">1. Select Athlete</label>
+                <select id="lineupAthlete" onchange="syncLineupCheckboxesForAthlete()"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-semibold">
+                  ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name} (${a.Division} &bull; ${a.Event_Group})</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Title (For Print Header)</label>
+                <input id="lineupMeetTitle" type="text" value="Official Meet Lineup" oninput="renderLineupTable()"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-400 mb-2">2. Check Events for Selected Athlete</label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                ${Object.entries(EVENT_CATALOG).map(([cat, events]) => {
+                  const visible = events.filter(ev => enabledSet.has(ev));
+                  if (visible.length === 0) return '';
+                  return `
+                    <div class="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2">
+                      <p class="text-xs font-bold uppercase tracking-wider text-rose-400">${cat}</p>
+                      ${visible.map(ev => {
+                        const isRelay = cat === 'Relays' || ev.includes('Relay');
+                        const safeId = ev.replace(/[^a-zA-Z0-9]/g, '_');
+                        return `
+                          <div class="flex items-center justify-between gap-2">
+                            <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer">
+                              <input type="checkbox" value="${ev}" data-is-relay="${isRelay}"
+                                onchange="toggleRelayLegPicker('${safeId}', this.checked)"
+                                class="lineup-ev-cb rounded bg-slate-800 border-slate-600 text-rose-600 focus:ring-rose-500" />
+                              <span>${ev}</span>
+                            </label>
+                            ${isRelay ? `
+                              <select id="leg_${safeId}" class="hidden bg-slate-800 border border-amber-500/50 rounded-lg px-2 py-0.5 text-[11px] text-amber-400 font-semibold">
+                                <option value="Leg 1">Leg 1</option>
+                                <option value="Leg 2">Leg 2</option>
+                                <option value="Leg 3">Leg 3</option>
+                                <option value="Leg 4">Leg 4</option>
+                                <option value="Alternate">Alt</option>
+                              </select>
+                            ` : ''}
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2">
+              <span id="lineupSelectedCount" class="text-xs text-slate-400">Check events above, then save to lineup</span>
+              <button type="button" onclick="saveAthleteLineupEvents()"
+                class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-lg shadow-rose-900/30 transition">
+                Save Athlete Events to Meet Sheet
               </button>
             </div>
           </div>
@@ -1476,61 +1602,128 @@
           <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 print-card">
             <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
               <div>
-                <h3 class="text-lg font-bold text-white">${appData.settings.Program_Name || 'StatSlate Track & Field'} — Official Meet Lineup</h3>
-                <p class="text-xs text-slate-400">Generated ${new Date().toLocaleDateString()}</p>
+                <h3 id="printMeetHeading" class="text-lg font-bold text-white">${appData.settings.Program_Name || 'StatSplit Track & Field'} — Official Meet Lineup</h3>
+                <p class="text-xs text-slate-400">Ordered by Standard Meet Schedule &bull; Generated ${new Date().toLocaleDateString()}</p>
               </div>
-              <button onclick="clearLineup()" class="text-xs text-rose-400 hover:underline no-print">Clear Sheet</button>
+              <button onclick="clearLineup()" class="text-xs text-rose-400 hover:underline no-print">Clear Entire Sheet</button>
             </div>
             <div id="lineupSheetBody"></div>
           </div>
         </div>
       `;
 
+      syncLineupCheckboxesForAthlete();
       renderLineupTable();
     }
 
-    function addLineupEntry() {
-      const eventName = document.getElementById('lineupEvent').value;
-      const athId = document.getElementById('lineupAthlete').value;
-      const role = document.getElementById('lineupRole').value.trim() || 'Open Entry';
+    function toggleRelayLegPicker(safeId, isChecked) {
+      const picker = document.getElementById(`leg_${safeId}`);
+      if (picker) picker.classList.toggle('hidden', !isChecked);
+    }
+
+    function syncLineupCheckboxesForAthlete() {
+      const athId = document.getElementById('lineupAthlete')?.value;
+      const existing = meetLineupRows.filter(r => r.athleteId === athId);
+      const existingMap = new Map(existing.map(r => [r.event, r.role]));
+
+      document.querySelectorAll('.lineup-ev-cb').forEach(cb => {
+        const ev = cb.value;
+        const safeId = ev.replace(/[^a-zA-Z0-9]/g, '_');
+        const hasEvent = existingMap.has(ev);
+        cb.checked = hasEvent;
+
+        const picker = document.getElementById(`leg_${safeId}`);
+        if (picker) {
+          picker.classList.toggle('hidden', !hasEvent);
+          if (hasEvent) picker.value = existingMap.get(ev);
+        }
+      });
+    }
+
+    function saveAthleteLineupEvents() {
+      const athId = document.getElementById('lineupAthlete')?.value;
       const ath = appData.athletes.find(a => a.Athlete_ID === athId);
       if (!ath) return;
 
-      const board = StatsEngine.buildEventLeaderboard(appData.logs, eventName, 'ALL', 'ALL');
-      const match = board.find(b => b.athleteName === ath.Name);
-      const seedMark = match ? match.prMark : 'NT / NM';
+      // Replace existing entries for this athlete so re-saving updates cleanly without duplicates
+      meetLineupRows = meetLineupRows.filter(r => r.athleteId !== athId);
 
-      meetLineupRows.push({
-        id: Date.now(),
-        event: eventName,
-        athleteName: ath.Name,
-        division: ath.Division,
-        role,
-        seedMark
+      const checkedBoxes = Array.from(document.querySelectorAll('.lineup-ev-cb:checked'));
+      checkedBoxes.forEach((cb, idx) => {
+        const eventName = cb.value;
+        const safeId = eventName.replace(/[^a-zA-Z0-9]/g, '_');
+        const legPicker = document.getElementById(`leg_${safeId}`);
+        const role = legPicker ? legPicker.value : 'Open Entry';
+
+        const board = StatsEngine.buildEventLeaderboard(appData.logs, eventName, 'ALL', 'ALL');
+        const match = board.find(b => b.athleteName === ath.Name);
+        const seedMark = match ? match.prMark : 'NT / NM';
+
+        meetLineupRows.push({
+          id: Date.now() + idx,
+          athleteId: ath.Athlete_ID,
+          event: eventName,
+          athleteName: ath.Name,
+          division: ath.Division,
+          role,
+          seedMark
+        });
       });
 
-      document.getElementById('lineupRole').value = '';
       renderLineupTable();
     }
 
     function removeLineupEntry(id) {
       meetLineupRows = meetLineupRows.filter(r => r.id !== id);
+      syncLineupCheckboxesForAthlete();
       renderLineupTable();
     }
 
     function clearLineup() {
+      if (meetLineupRows.length > 0 && !confirm('Clear all entries from the meet sheet?')) return;
       meetLineupRows = [];
+      syncLineupCheckboxesForAthlete();
       renderLineupTable();
     }
 
     function renderLineupTable() {
       const target = document.getElementById('lineupSheetBody');
+      const heading = document.getElementById('printMeetHeading');
+      const customTitle = document.getElementById('lineupMeetTitle')?.value.trim();
+      if (heading) {
+        heading.textContent = `${appData.settings.Program_Name || 'StatSplit Track & Field'} — ${customTitle || 'Official Meet Lineup'}`;
+      }
       if (!target) return;
 
       if (meetLineupRows.length === 0) {
-        target.innerHTML = `<p class="text-sm text-slate-400 py-6 text-center">No entries added yet. Use the form above to build your meet lineup or relay order.</p>`;
+        target.innerHTML = `<p class="text-sm text-slate-400 py-6 text-center">No entries added yet. Select an athlete above and check their events to build the meet sheet.</p>`;
         return;
       }
+
+      // Group rows by event
+      const grouped = {};
+      meetLineupRows.forEach(r => {
+        if (!grouped[r.event]) grouped[r.event] = [];
+        grouped[r.event].push(r);
+      });
+
+      // Sort events by standard track meet order
+        const sortedEvents = Object.keys(grouped).sort((a, b) => {
+        const idxA = STANDARD_MEET_ORDER.indexOf(a);
+        const idxB = STANDARD_MEET_ORDER.indexOf(b);
+        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+      });
+
+      // Build the sorted result object or render the grouped events
+        const result = {};
+        sortedEvents.forEach((event) => {
+      // Optional: Sort athletes/results within each event by mark/time
+        grouped[event].sort((a, b) => a.numericMark - b.numericMark);
+        result[event] = grouped[event];
+      });
+
+      return result;
+    }
 
       target.innerHTML = `
         <table class="w-full text-left border-collapse text-sm">
