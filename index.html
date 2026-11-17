@@ -986,14 +986,11 @@
     }
 
     function resetStopwatch() {
-      if (swState.elapsedMs > 0 && !confirm('Reset the stopwatch and clear current unsaved splits?')) return;
+      if ((swState.elapsedMs > 0 || swState.racers.length > 0) && !confirm('Reset the stopwatch and clear all athletes and unsaved splits?')) return;
       swState.running = false;
       cancelAnimationFrame(swState.rafId);
       swState.elapsedMs = 0;
-      swState.racers.forEach(r => {
-        r.splits = [];
-        r.finished = false;
-      });
+      swState.racers = [];
       renderStopwatchView();
     }
 
