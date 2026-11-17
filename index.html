@@ -732,7 +732,15 @@
     }
 
     function switchCoachSubTab(subTab) {
-          let currentCoachSubTab = 'launcher';
+    let currentCoachSubTab = 'launcher';
+
+    function switchCoachSubTab(subTab) {
+      currentCoachSubTab = subTab;
+      renderCoachWorkspace();
+    }
+
+    function renderCoachWorkspace() {
+      const ws = document.getElementById('coachWorkspace');
 
     function renderCoachWorkspace() {
       const ws = document.getElementById('coachWorkspace');
