@@ -2001,7 +2001,7 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-700">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-700">
               <div>
                 <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">1. Select Athlete</label>
                 <select id="lineupAthlete" onchange="syncLineupCheckboxesForAthlete()"
@@ -2011,6 +2011,23 @@
                 </select>
               </div>
               <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Title</label>
+                <input id="lineupMeetTitle" type="text" value="Official Meet Lineup" oninput="renderLineupTable()"
+                  placeholder="e.g. League Invitational"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Date</label>
+                <input id="lineupMeetDate" type="date" value="${new Date().toISOString().slice(0, 10)}" onchange="renderLineupTable()"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Location</label>
+                <input id="lineupMeetLocation" type="text" value="" oninput="renderLineupTable()"
+                  placeholder="e.g. North Stadium / Home Track"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
+              </div>
+            </div>
                 <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Title</label>
                 <input id="lineupMeetTitle" type="text" value="Official Meet Lineup" oninput="renderLineupTable()"
                   placeholder="e.g. League Invitational"
@@ -2196,7 +2213,7 @@
       renderLineupTable();
     }
 
-        async function downloadLineupPng() {
+    async function downloadLineupPng() {
       if (meetLineupRows.length === 0) {
         return alert('Add at least one athlete to the meet lineup before downloading the PNG.');
       }
@@ -2219,7 +2236,8 @@
         });
 
         const rawTitle = document.getElementById('lineupMeetTitle')?.value.trim() || 'Meet_Lineup';
-        const safeFilename = `${rawTitle.replace(/[^a-zA-Z0-9_-]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.png`;
+        const meetDate = document.getElementById('lineupMeetDate')?.value || new Date().toISOString().slice(0, 10);
+        const safeFilename = `${rawTitle.replace(/[^a-zA-Z0-9_-]+/g, '_')}_${meetDate}.png`;
         const dataUrl = canvas.toDataURL('image/png');
 
         // Trigger download for Desktop / Android
@@ -2261,8 +2279,16 @@
       const customTitle = document.getElementById('lineupMeetTitle')?.value.trim();
       const customLocation = document.getElementById('lineupMeetLocation')?.value.trim();
 
-      if (heading) {
-        heading.textContent = customTitle || 'Official Meet Lineup';
+      if (subheading) {
+        const rawDate = document.getElementById('lineupMeetDate')?.value;
+        let datePart = new Date().toLocaleDateString();
+        if (rawDate) {
+          const [y, m, d] = rawDate.split('-');
+          if (y && m && d) datePart = `${Number(m)}/${Number(d)}/${y}`;
+        }
+        subheading.textContent = customLocation
+          ? `${customLocation}  •  ${datePart}`
+          : `Official Roster & Seed Marks  •  ${datePart}`;
       }
       if (subheading) {
         const datePart = new Date().toLocaleDateString();
