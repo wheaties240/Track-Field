@@ -939,6 +939,16 @@
       const sStr = String(seconds).padStart(2, '0');
       return minutes > 0 ? `${minutes}:${sStr}.${hStr}` : `${seconds}.${hStr}`;
     }
+        function exitStopwatchFocusMode() {
+      if (swState.running && !confirm('The race clock is still running. Pause and exit Stopwatch Focus Mode?')) {
+        return;
+      }
+      if (swState.running) {
+        swState.running = false;
+        cancelAnimationFrame(swState.rafId);
+      }
+      switchCoachSubTab('launcher');
+    }
 
     function renderStopwatchView() {
       const container = document.getElementById('coachSubView');
@@ -1261,6 +1271,252 @@
         r.splits = [];
         r.finished = false;
       });
+      renderStopwatchView();
+    }
+        function isRelayModeActive() {
+      return swState.event.includes('Relay');
+    }
+
+    function getActiveRelayLegIndex() {
+      if (!isRelayModeActive()) return -1;
+      return swState.racers.findIndex(r => !r.finished);
+    }
+
+    function getAthleteInitials(fullName) {
+      return String(fullName || '')
+        .trim()
+        .split(/\s+/)
+        .map(part => part[0]?.toUpperCase() || '')
+        .join('');
+    }
+
+    function recordRacerSplit(athId, isFinish = false) {
+      if (!swState.running && swState.elapsedMs === 0) {
+        return alert('Start the race clock first.');
+      }
+      const racerIdx = swState.racers.findIndex(r => r.id === athId);
+      const racer = swState.racers[racerIdx];
+      if (!racer || racer.finished) return;
+
+      const currentMs = swState.running ? (performance.now() - swState.startTime) : swState.elapsedMs;
+
+      if (isRelayModeActive()) {
+        const prevLegTotalMs = racerIdx > 0 && swState.racers[racerIdx - 1].splits.length > 0
+          ? swState.racers[racerIdx - 1].splits[0].totalMs
+          : 0;
+        const legSplitMs = Math.max(0, currentMs - prevLegTotalMs);
+
+        racer.splits = [{
+          lap: racerIdx + 1,
+          lapMs: legSplitMs,
+          totalMs: currentMs
+        }];
+        racer.finished = true;
+      } else {
+        const prevTotalMs = racer.splits.length > 0 ? racer.splits[racer.splits.length - 1].totalMs : 0;
+        const lapMs = Math.max(0, currentMs - prevTotalMs);
+
+        racer.splits.push({
+          lap: racer.splits.length + 1,
+          lapMs,
+          totalMs: currentMs
+        });
+        if (isFinish) racer.finished = true;
+      }
+
+      renderStopwatchRacers();
+    }
+
+    function undoRacerLastSplit(athId) {
+      const racerIdx = swState.racers.findIndex(r => r.id === athId);
+      const racer = swState.racers[racerIdx];
+      if (!racer || racer.splits.length === 0) return;
+
+      if (isRelayModeActive()) {
+        for (let i = racerIdx; i < swState.racers.length; i++) {
+          swState.racers[i].splits = [];
+          swState.racers[i].finished = false;
+        }
+      } else {
+        racer.splits.pop();
+        racer.finished = false;
+      }
+      renderStopwatchRacers();
+    }
+
+    function renderStopwatchRacers() {
+      const list = document.getElementById('swRacersList');
+      if (!list) return;
+
+      const relayMode = isRelayModeActive();
+      const activeLegIdx = getActiveRelayLegIndex();
+
+      if (swState.racers.length === 0) {
+        list.innerHTML = `
+          <div class="bg-slate-900/70 border border-dashed border-slate-800 rounded-xl p-6 text-center text-xs text-slate-400">
+            ${relayMode
+              ? 'Add up to 4 relay runners in order (Leg 1 through Leg 4), then tap <span class="text-emerald-400 font-semibold">Start</span>.'
+              : 'Add up to 8 athletes above, then tap <span class="text-amber-400 font-semibold">Hide Setup</span> or <span class="text-emerald-400 font-semibold">Start</span>.'}
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = swState.racers.map((r, idx) => {
+        const lastSplit = r.splits.length > 0 ? r.splits[r.splits.length - 1] : null;
+        const isCurrentBaton = relayMode && idx === activeLegIdx;
+        const isWaitingBaton = relayMode && idx > activeLegIdx && activeLegIdx !== -1;
+        const isAnchor = relayMode && idx === swState.racers.length - 1;
+
+        const lapHistory = relayMode
+          ? (lastSplit ? `Leg ${idx + 1} Split: ${formatStopwatchMs(lastSplit.lapMs)} (Team: ${formatStopwatchMs(lastSplit.totalMs)})` : (isCurrentBaton ? 'On Track — Holding Baton' : `Waiting for Leg ${idx}`))
+          : (r.splits.map(s => `L${s.lap}:${formatStopwatchMs(s.lapMs)}`).join(' · ') || 'Ready');
+
+        return `
+          <div class="bg-slate-900 border ${isCurrentBaton ? 'border-rose-500 ring-1 ring-rose-500/40' : (r.finished ? 'border-amber-500/50' : 'border-slate-800')} rounded-xl px-2.5 py-2 flex items-center justify-between gap-2 transition">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              ${relayMode
+                ? `<span class="px-2 py-1 rounded-lg font-mono font-bold text-[11px] shrink-0 ${isCurrentBaton ? 'bg-rose-600 text-white' : 'bg-slate-950 border border-slate-800 text-amber-400'}">Leg ${idx + 1}</span>`
+                : `<input type="number" min="1" max="12" value="${r.lane}" onchange="updateRacerLane('${r.id}', this.value)" title="Lane" class="w-8 h-8 text-center bg-slate-950 border border-slate-800 rounded-lg font-mono font-bold text-amber-400 text-xs shrink-0" />`
+              }
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sm font-bold text-white truncate">${r.name}</span>
+                  ${r.finished ? `<span class="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold uppercase shrink-0">Done</span>` : ''}
+                </div>
+                <p class="text-[11px] font-mono ${isCurrentBaton ? 'text-rose-300' : 'text-slate-400'} truncate">
+                  ${lapHistory}
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+              ${relayMode ? `
+                <button type="button" onclick="recordRacerSplit('${r.id}', ${isAnchor})" ${r.finished || isWaitingBaton ? 'disabled' : ''}
+                  class="px-3.5 py-2 rounded-lg font-bold text-xs transition ${
+                    r.finished || isWaitingBaton
+                      ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                      : (isAnchor
+                          ? 'bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950'
+                          : 'bg-rose-600 hover:bg-rose-500 active:scale-95 text-white shadow')
+                  }">
+                  ${r.finished ? formatStopwatchMs(lastSplit.lapMs) : (isAnchor ? 'Anchor Finish' : `Handoff -> L${idx + 2}`)}
+                </button>
+              ` : `
+                <button type="button" onclick="recordRacerSplit('${r.id}', false)" ${r.finished ? 'disabled' : ''}
+                  class="px-3 py-2 rounded-lg font-bold text-xs transition ${
+                    r.finished ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-500 active:scale-95 text-white'
+                  }">
+                  Split${r.splits.length > 0 ? ` (${r.splits.length})` : ''}
+                </button>
+                <button type="button" onclick="recordRacerSplit('${r.id}', true)" ${r.finished ? 'disabled' : ''}
+                  class="px-2.5 py-2 rounded-lg font-bold text-xs transition ${
+                    r.finished ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950'
+                  }">
+                  Fin
+                </button>
+              `}
+
+              ${r.splits.length > 0
+                ? `<button type="button" onclick="undoRacerLastSplit('${r.id}')" title="Undo" class="px-1.5 py-1 text-[11px] text-slate-400 hover:text-amber-400">Undo</button>`
+                : `<button type="button" onclick="removeRacerFromStopwatch('${r.id}')" title="Remove" class="px-1.5 py-1 text-[11px] text-slate-500 hover:text-rose-400">Del</button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    async function saveStopwatchToProfiles() {
+      const racersWithSplits = swState.racers.filter(r => r.splits.length > 0);
+      if (racersWithSplits.length === 0) {
+        return alert('Record at least one split before saving to athlete profiles.');
+      }
+
+      if (swState.running) {
+        swState.running = false;
+        cancelAnimationFrame(swState.rafId);
+      }
+
+      const category = Object.keys(EVENT_CATALOG).find(cat =>
+        EVENT_CATALOG[cat].includes(swState.event)
+      ) || 'Distance';
+
+      const today = new Date().toISOString().slice(0, 10);
+      const baseLabel = swState.sessionName.trim() || 'Track Splits';
+      const logsToSave = [];
+
+      if (isRelayModeActive()) {
+        const finalRunner = racersWithSplits[racersWithSplits.length - 1];
+        const teamTotalMs = finalRunner.splits[0].totalMs;
+        const formattedTeamTotal = formatStopwatchMs(teamTotalMs);
+        const teamTotalSec = Number((teamTotalMs / 1000).toFixed(2));
+
+        racersWithSplits.forEach((r, i) => {
+          const legMs = r.splits[0].lapMs;
+          const teammateInitials = racersWithSplits
+            .filter((_, idx) => idx !== i)
+            .map(tm => getAthleteInitials(tm.name))
+            .join(', ');
+          const squadTag = teammateInitials ? `w/ ${teammateInitials}` : 'Solo Relay';
+
+          logsToSave.push({
+            Date: today,
+            Meet_Name: `${baseLabel} — Leg ${i + 1} Split [Team Relay ${squadTag}: ${formattedTeamTotal}]`,
+            Athlete_ID: r.id,
+            Athlete_Name: r.name,
+            Division: r.division,
+            Category: 'Relays',
+            Event: `${swState.event} (Leg Split)`,
+            Raw_Mark: formatStopwatchMs(legMs),
+            Numeric_Value: Number((legMs / 1000).toFixed(2)),
+            Is_Official: swState.isOfficial,
+            Entered_By: 'Coach-RelayTimer'
+          });
+
+          logsToSave.push({
+            Date: today,
+            Meet_Name: `${baseLabel} [Team Relay — Leg ${i + 1} ${squadTag}]`,
+            Athlete_ID: r.id,
+            Athlete_Name: r.name,
+            Division: r.division,
+            Category: 'Relays',
+            Event: swState.event,
+            Raw_Mark: formattedTeamTotal,
+            Numeric_Value: teamTotalSec,
+            Is_Official: swState.isOfficial,
+            Entered_By: 'Coach-RelayTimer'
+          });
+        });
+      } else {
+        racersWithSplits.forEach(r => {
+          const finalSplit = r.splits[r.splits.length - 1];
+          const totalSec = Number((finalSplit.totalMs / 1000).toFixed(2));
+          const formattedTotal = formatStopwatchMs(finalSplit.totalMs);
+          const lapBreakdown = r.splits.map(s => `L${s.lap}:${formatStopwatchMs(s.lapMs)}`).join(' | ');
+
+          logsToSave.push({
+            Date: today,
+            Meet_Name: `${baseLabel} [${lapBreakdown}]`,
+            Athlete_ID: r.id,
+            Athlete_Name: r.name,
+            Division: r.division,
+            Category: category,
+            Event: swState.event,
+            Raw_Mark: formattedTotal,
+            Numeric_Value: totalSec,
+            Is_Official: swState.isOfficial,
+            Entered_By: 'Coach-Stopwatch'
+          });
+        });
+      }
+
+      await StorageAdapter.addLogs(logsToSave);
+      appData = await StorageAdapter.getAllData();
+
+      alert(`Saved ${logsToSave.length} record(s) to athlete profiles.`);
+      swState.elapsedMs = 0;
+      swState.racers = [];
+      swState.setupCollapsed = false;
       renderStopwatchView();
     }
     
