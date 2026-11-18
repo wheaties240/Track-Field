@@ -129,7 +129,7 @@
 
   <footer class="border-t border-slate-800 py-4 px-4 text-center text-xs text-slate-500 no-print">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-      <span>StatSlate Athletics Platform</span>
+      <span>StatSplit Athletics Platform</span>
       <button onclick="openRawDataModal()" class="text-slate-500 hover:text-slate-300 underline transition">Manage Raw Meet Data</button>
     </div>
   </footer>
@@ -139,7 +139,7 @@
     /* ==========================================================================
        1. CLOUD-READY DATA ADAPTER (localStorage + Seed Data using 'athletes')
        ========================================================================== */
-    const STORAGE_KEY = 'statslate_tf_v1';
+    const STORAGE_KEY = 'statsplit_tf_v1';
 
     const EVENT_CATALOG = {
       Sprints: ['60m', '100m', '200m', '400m'],
@@ -159,7 +159,7 @@
       settings: {
         Team_Code: 'TRACK26',
         Coach_PIN: '1234',
-        Program_Name: 'StatSlate Track & Field'
+        Program_Name: 'StatSplit Track & Field'
       },
       athletes: [
         { Athlete_ID: 'ATH-101', Name: 'Jordan Taylor', Division: '8th Grade', Event_Group: 'Sprints', Status: 'Active' },
@@ -458,16 +458,16 @@
     async function initApp() {
       appData = await StorageAdapter.getAllData();
       document.getElementById('headerProgramName').textContent =
-        appData.settings.Program_Name || 'StatSlate Track & Field';
+        appData.settings.Program_Name || 'StatSplit Track & Field';
 
       populateCategoryDropdown('athCategorySelect');
       populateEventDropdown('athCategorySelect', 'athEventSelect');
       refreshAthleteDropdowns();
 
-      if (localStorage.getItem('statslate_tf_ath_unlocked') === 'true') {
+      if (localStorage.getItem('statsplit_tf_ath_unlocked') === 'true') {
         showAthleteLogger();
       }
-      if (sessionStorage.getItem('statslate_tf_coach_unlocked') === 'true') {
+      if (sessionStorage.getItem('statsplit_tf_coach_unlocked') === 'true') {
         showCoachWorkspace();
       }
     }
@@ -494,7 +494,7 @@
       const entered = document.getElementById('inputTeamCode').value.trim().toUpperCase();
       const expected = (appData.settings.Team_Code || 'TRACK26').toUpperCase();
       if (entered === expected) {
-        localStorage.setItem('statslate_tf_ath_unlocked', 'true');
+        localStorage.setItem('statsplit_tf_ath_unlocked', 'true');
         document.getElementById('athleteGateError').classList.add('hidden');
         showAthleteLogger();
       } else {
@@ -503,7 +503,7 @@
     }
 
     function lockAthlete() {
-      localStorage.removeItem('statslate_tf_ath_unlocked');
+      localStorage.removeItem('statsplit_tf_ath_unlocked');
       document.getElementById('athleteGate').classList.remove('hidden');
       document.getElementById('athleteLogger').classList.add('hidden');
     }
@@ -711,7 +711,7 @@
       const entered = document.getElementById('inputCoachPin').value.trim();
       const expected = String(appData.settings.Coach_PIN || '1234').trim();
       if (entered === expected) {
-        sessionStorage.setItem('statslate_tf_coach_unlocked', 'true');
+        sessionStorage.setItem('statsplit_tf_coach_unlocked', 'true');
         document.getElementById('coachGateError').classList.add('hidden');
         showCoachWorkspace();
       } else {
@@ -720,7 +720,7 @@
     }
 
     function lockCoach() {
-      sessionStorage.removeItem('statslate_tf_coach_unlocked');
+      sessionStorage.removeItem('statsplit_tf_coach_unlocked');
       document.getElementById('coachGate').classList.remove('hidden');
       document.getElementById('coachWorkspace').classList.add('hidden');
     }
@@ -1993,12 +1993,16 @@
       });
     }
 
-    function saveAthleteLineupEvents() {
-      const athId = document.getElementById('lineupAthlete')?.value;
-      const ath = appData.athletes.find(a => a.Athlete_ID === athId);
-      if (!ath) return;
+     function saveAthleteLineupEvents() {
+      const athSelect = document.getElementById('lineupAthlete');
+      if (!athSelect || !athSelect.value) {
+        return alert('Please select an athlete first.');
+      }
 
-      // Replace existing entries for this athlete so re-saving updates cleanly without duplicates
+      const athId = athSelect.value;
+      const ath = appData.athletes.find(a => a.Athlete_ID === athId);
+      if (!ath) return alert('Athlete not found.');
+
       meetLineupRows = meetLineupRows.filter(r => r.athleteId !== athId);
 
       const checkedBoxes = Array.from(document.querySelectorAll('.lineup-ev-cb:checked'));
@@ -2022,6 +2026,14 @@
           seedMark
         });
       });
+
+      const statusEl = document.getElementById('lineupSelectedCount');
+      if (statusEl) {
+        statusEl.textContent = checkedBoxes.length > 0
+          ? `Saved ${checkedBoxes.length} event(s) for ${ath.Name}.`
+          : `Cleared events for ${ath.Name}.`;
+        statusEl.className = 'text-xs font-semibold text-emerald-400';
+      }
 
       renderLineupTable();
     }
@@ -2053,54 +2065,57 @@
         return;
       }
 
-      // Group rows by event
-        const grouped = {};
+      const meetOrder = typeof STANDARD_MEET_ORDER !== 'undefined' ? STANDARD_MEET_ORDER : [];
+      const grouped = {};
       meetLineupRows.forEach(r => {
         if (!grouped[r.event]) grouped[r.event] = [];
         grouped[r.event].push(r);
       });
 
-      // Sort events by standard track meet order
-        const sortedEvents = Object.keys(grouped).sort((a, b) => {
-        const idxA = STANDARD_MEET_ORDER.indexOf(a);
-        const idxB = STANDARD_MEET_ORDER.indexOf(b);
+      const sortedEvents = Object.keys(grouped).sort((a, b) => {
+        const idxA = meetOrder.indexOf(a);
+        const idxB = meetOrder.indexOf(b);
         return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
       });
 
-        const meetLineupRows = [];
-        sortedEvents.forEach((event) => {
-        grouped[event].forEach((row) => {
-          meetLineupRows.push(row);
-        });
-      });
-
       target.innerHTML = `
-        <table class="w-full text-left border-collapse text-sm">
-          <thead>
-            <tr class="border-b border-slate-700 text-xs uppercase text-slate-400">
-              <th class="py-2 px-3">Event</th>
-              <th class="py-2 px-3">Athlete</th>
-              <th class="py-2 px-3">Division</th>
-              <th class="py-2 px-3">Leg / Assignment</th>
-              <th class="py-2 px-3">Seed PR</th>
-              <th class="py-2 px-3 text-right no-print">Remove</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-700/60">
-            ${meetLineupRows.map(r => `
-              <tr>
-                <td class="py-2.5 px-3 font-semibold text-white">${r.event}</td>
-                <td class="py-2.5 px-3 text-slate-200">${r.athleteName}</td>
-                <td class="py-2.5 px-3 text-slate-400 text-xs">${r.division}</td>
-                <td class="py-2.5 px-3 text-amber-400 font-medium">${r.role}</td>
-                <td class="py-2.5 px-3 font-mono font-bold text-white">${r.seedMark}</td>
-                <td class="py-2.5 px-3 text-right no-print">
-                  <button onclick="removeLineupEntry(${r.id})" class="text-xs text-rose-400 hover:underline">Remove</button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        <div class="space-y-5">
+          ${sortedEvents.map(ev => {
+            const entries = grouped[ev].sort((a, b) => a.role.localeCompare(b.role) || a.athleteName.localeCompare(b.athleteName));
+            return `
+              <div class="border border-slate-700 rounded-xl overflow-hidden">
+                <div class="bg-slate-900 px-4 py-2 border-b border-slate-700 flex items-center justify-between">
+                  <span class="font-bold text-sm text-rose-400 uppercase tracking-wider">${ev}</span>
+                  <span class="text-xs text-slate-400">${entries.length} ${entries.length === 1 ? 'Entry' : 'Entries'}</span>
+                </div>
+                <table class="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr class="border-b border-slate-700/70 text-[11px] uppercase text-slate-400">
+                      <th class="py-1.5 px-4">Athlete</th>
+                      <th class="py-1.5 px-4">Division</th>
+                      <th class="py-1.5 px-4">Assignment / Leg</th>
+                      <th class="py-1.5 px-4">Seed PR</th>
+                      <th class="py-1.5 px-4 text-right no-print">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-700/50">
+                    ${entries.map(r => `
+                      <tr>
+                        <td class="py-2 px-4 font-semibold text-white">${r.athleteName}</td>
+                        <td class="py-2 px-4 text-slate-400 text-xs">${r.division}</td>
+                        <td class="py-2 px-4 text-amber-400 font-medium text-xs">${r.role}</td>
+                        <td class="py-2 px-4 font-mono font-bold text-white">${r.seedMark}</td>
+                        <td class="py-2 px-4 text-right no-print">
+                          <button onclick="removeLineupEntry(${r.id})" class="text-xs text-rose-400 hover:underline">Remove</button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `;
+          }).join('')}
+        </div>
       `;
     }
 
@@ -2219,7 +2234,7 @@
             <div id="athleteReportCard" class="print-card bg-slate-900 border-2 border-rose-600/80 rounded-2xl overflow-hidden shadow-2xl">
               <div class="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 px-6 py-5 flex items-center justify-between">
                 <div>
-                  <p class="text-[11px] font-bold uppercase tracking-widest text-rose-100">${appData.settings.Program_Name || 'StatSlate Track & Field'}</p>
+                  <p class="text-[11px] font-bold uppercase tracking-widest text-rose-100">${appData.settings.Program_Name || 'StatSplit Track & Field'}</p>
                   <h2 class="text-2xl font-black tracking-tight text-white mt-0.5">${athlete.Name}</h2>
                   <p class="text-xs font-semibold text-amber-100 mt-1">${athlete.Division} &bull; ${athlete.Event_Group}</p>
                 </div>
@@ -2283,13 +2298,13 @@
       if (!cardEl || typeof html2canvas === 'undefined') return;
       const canvas = await html2canvas(cardEl, { backgroundColor: '#0f172a', scale: 2 });
       const link = document.createElement('a');
-      link.download = `${athleteName.replace(/\s+/g, '_')}_StatSlate_Card.png`;
+      link.download = `${athleteName.replace(/\s+/g, '_')}_StatSplit_Card.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     }
 
     function openRawDataModal() {
-      if (sessionStorage.getItem('statslate_tf_coach_unlocked') !== 'true') {
+      if (sessionStorage.getItem('statsplit_tf_coach_unlocked') !== 'true') {
         alert('Unlock the Coach Dashboard with your Coach PIN first to manage raw data.');
         switchTab('coach');
         return;
@@ -2410,7 +2425,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `StatSlate_TrackField_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `StatSplit_TrackField_Backup_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
     }
