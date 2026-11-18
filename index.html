@@ -1915,7 +1915,7 @@
 
     let meetLineupRows = [];
 
-    function renderLineupBuilderView() {
+       function renderLineupBuilderView() {
       const container = document.getElementById('coachSubView');
       const enabledSet = new Set(getEnabledEventsList());
       const activeAthletes = [...appData.athletes]
@@ -1928,24 +1928,39 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 class="text-xl font-bold text-white">Meet Lineup &amp; Relay Builder</h2>
-                <p class="text-xs text-slate-400">Select an athlete, check all their events, and assign relay legs in one step.</p>
+                <p class="text-xs text-slate-400">Select an athlete, check all their events, and export a printable sheet or shareable PNG.</p>
               </div>
-              <button onclick="window.print()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition">
-                Print Meet Sheet
-              </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="downloadLineupPng()"
+                  class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-xl text-sm shadow transition">
+                  Download PNG
+                </button>
+                <button type="button" onclick="window.print()"
+                  class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition">
+                  Print Sheet
+                </button>
+              </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-700">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-700">
               <div>
                 <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">1. Select Athlete</label>
                 <select id="lineupAthlete" onchange="syncLineupCheckboxesForAthlete()"
                   class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-semibold">
-                  ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name} (${a.Division} &bull; ${a.Event_Group})</option>`).join('')}
+                  <option value="">-- Choose Athlete --</option>
+                  ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name} (${a.Division})</option>`).join('')}
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Title (For Print Header)</label>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Title</label>
                 <input id="lineupMeetTitle" type="text" value="Official Meet Lineup" oninput="renderLineupTable()"
+                  placeholder="e.g. League Invitational"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Location</label>
+                <input id="lineupMeetLocation" type="text" value="" oninput="renderLineupTable()"
+                  placeholder="e.g. North Stadium / Home Track"
                   class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
               </div>
             </div>
@@ -1988,8 +2003,8 @@
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-2">
-              <span id="lineupSelectedCount" class="text-xs text-slate-400">Check events above, then save to lineup</span>
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <span id="lineupSelectedCount" class="text-xs text-slate-400">Select an athlete, check their events, then save to lineup</span>
               <button type="button" onclick="saveAthleteLineupEvents()"
                 class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-lg shadow-rose-900/30 transition">
                 Save Athlete Events to Meet Sheet
@@ -1997,15 +2012,21 @@
             </div>
           </div>
 
-          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 print-card">
-            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+          <!-- STYLIZED SHAREABLE & PRINTABLE MEET SHEET CARD -->
+          <div id="meetLineupExportCard" class="bg-slate-900 border-2 border-rose-600/70 rounded-2xl overflow-hidden shadow-2xl print-card">
+            <div class="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 id="printMeetHeading" class="text-lg font-bold text-white">${appData.settings.Program_Name || 'StatSplit Track & Field'} — Official Meet Lineup</h3>
-                <p class="text-xs text-slate-400">Ordered by Standard Meet Schedule &bull; Generated ${new Date().toLocaleDateString()}</p>
+                <p class="text-[11px] font-bold uppercase tracking-widest text-rose-100">${appData.settings.Program_Name || 'StatSplit Track & Field'}</p>
+                <h3 id="printMeetHeading" class="text-xl sm:text-2xl font-black tracking-tight text-white mt-0.5">Official Meet Lineup</h3>
+                <p id="printMeetSubheading" class="text-xs font-semibold text-amber-100 mt-1">Generated ${new Date().toLocaleDateString()}</p>
               </div>
-              <button onclick="clearLineup()" class="text-xs text-rose-400 hover:underline no-print">Clear Entire Sheet</button>
+              <button onclick="clearLineup()" class="text-xs bg-slate-950/30 hover:bg-slate-950/50 text-white px-3 py-1.5 rounded-lg border border-white/20 no-print transition">
+                Clear Sheet
+              </button>
             </div>
-            <div id="lineupSheetBody"></div>
+            <div class="p-5 sm:p-6">
+              <div id="lineupSheetBody"></div>
+            </div>
           </div>
         </div>
       `;
@@ -2019,8 +2040,27 @@
       if (picker) picker.classList.toggle('hidden', !isChecked);
     }
 
+    function clearLineupBuilderInputs() {
+      const athSelect = document.getElementById('lineupAthlete');
+      if (athSelect) athSelect.value = '';
+      document.querySelectorAll('.lineup-ev-cb').forEach(cb => {
+        cb.checked = false;
+        const safeId = cb.value.replace(/[^a-zA-Z0-9]/g, '_');
+        const picker = document.getElementById(`leg_${safeId}`);
+        if (picker) {
+          picker.classList.add('hidden');
+          picker.value = 'Leg 1';
+        }
+      });
+    }
+
     function syncLineupCheckboxesForAthlete() {
       const athId = document.getElementById('lineupAthlete')?.value;
+      if (!athId) {
+        clearLineupBuilderInputs();
+        return;
+      }
+
       const existing = meetLineupRows.filter(r => r.athleteId === athId);
       const existingMap = new Map(existing.map(r => [r.event, r.role]));
 
@@ -2038,7 +2078,7 @@
       });
     }
 
-     function saveAthleteLineupEvents() {
+    function saveAthleteLineupEvents() {
       const athSelect = document.getElementById('lineupAthlete');
       if (!athSelect || !athSelect.value) {
         return alert('Please select an athlete first.');
@@ -2075,11 +2115,12 @@
       const statusEl = document.getElementById('lineupSelectedCount');
       if (statusEl) {
         statusEl.textContent = checkedBoxes.length > 0
-          ? `Saved ${checkedBoxes.length} event(s) for ${ath.Name}.`
+          ? `${checkedBoxes.length} event${checkedBoxes.length === 1 ? '' : 's'} entered for ${ath.Name}. Ready for next athlete.`
           : `Cleared events for ${ath.Name}.`;
-        statusEl.className = 'text-xs font-semibold text-emerald-400';
+        statusEl.className = 'text-xs font-bold text-emerald-400';
       }
 
+      clearLineupBuilderInputs();
       renderLineupTable();
     }
 
@@ -2092,16 +2133,48 @@
     function clearLineup() {
       if (meetLineupRows.length > 0 && !confirm('Clear all entries from the meet sheet?')) return;
       meetLineupRows = [];
-      syncLineupCheckboxesForAthlete();
+      clearLineupBuilderInputs();
       renderLineupTable();
+    }
+
+    async function downloadLineupPng() {
+      if (meetLineupRows.length === 0) {
+        return alert('Add at least one athlete to the meet lineup before downloading the PNG.');
+      }
+      const cardEl = document.getElementById('meetLineupExportCard');
+      if (!cardEl || typeof html2canvas === 'undefined') return;
+
+      const hiddenEls = cardEl.querySelectorAll('.no-print');
+      hiddenEls.forEach(el => el.style.display = 'none');
+
+      try {
+        const canvas = await html2canvas(cardEl, { backgroundColor: '#0f172a', scale: 2 });
+        const rawTitle = document.getElementById('lineupMeetTitle')?.value.trim() || 'Meet_Lineup';
+        const safeFilename = rawTitle.replace(/[^a-zA-Z0-9_-]+/g, '_');
+        const link = document.createElement('a');
+        link.download = `${safeFilename}_${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } finally {
+        hiddenEls.forEach(el => el.style.display = '');
+      }
     }
 
     function renderLineupTable() {
       const target = document.getElementById('lineupSheetBody');
       const heading = document.getElementById('printMeetHeading');
+      const subheading = document.getElementById('printMeetSubheading');
       const customTitle = document.getElementById('lineupMeetTitle')?.value.trim();
+      const customLocation = document.getElementById('lineupMeetLocation')?.value.trim();
+
       if (heading) {
-        heading.textContent = `${appData.settings.Program_Name || 'StatSplit Track & Field'} — ${customTitle || 'Official Meet Lineup'}`;
+        heading.textContent = customTitle || 'Official Meet Lineup';
+      }
+      if (subheading) {
+        const datePart = new Date().toLocaleDateString();
+        subheading.textContent = customLocation
+          ? `${customLocation}  •  ${datePart}`
+          : `Official Roster & Seed Marks  •  ${datePart}`;
       }
       if (!target) return;
 
@@ -2124,33 +2197,33 @@
       });
 
       target.innerHTML = `
-        <div class="space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 print-events-grid">
           ${sortedEvents.map(ev => {
             const entries = grouped[ev].sort((a, b) => a.role.localeCompare(b.role) || a.athleteName.localeCompare(b.athleteName));
             return `
-              <div class="border border-slate-700 rounded-xl overflow-hidden">
-                <div class="bg-slate-900 px-4 py-2 border-b border-slate-700 flex items-center justify-between">
+              <div class="bg-slate-800/90 border border-slate-700 rounded-xl overflow-hidden print-event-box">
+                <div class="bg-slate-950/70 px-4 py-2 border-b border-slate-700 flex items-center justify-between print-event-header">
                   <span class="font-bold text-sm text-rose-400 uppercase tracking-wider">${ev}</span>
                   <span class="text-xs text-slate-400">${entries.length} ${entries.length === 1 ? 'Entry' : 'Entries'}</span>
                 </div>
-                <table class="w-full text-left border-collapse text-sm">
+                <table class="w-full text-left border-collapse text-sm print-event-table">
                   <thead>
                     <tr class="border-b border-slate-700/70 text-[11px] uppercase text-slate-400">
-                      <th class="py-1.5 px-4">Athlete</th>
-                      <th class="py-1.5 px-4">Division</th>
-                      <th class="py-1.5 px-4">Assignment / Leg</th>
-                      <th class="py-1.5 px-4">Seed PR</th>
-                      <th class="py-1.5 px-4 text-right no-print">Action</th>
+                      <th class="py-1.5 px-3">Athlete</th>
+                      <th class="py-1.5 px-3">Div</th>
+                      <th class="py-1.5 px-3">Leg / Role</th>
+                      <th class="py-1.5 px-3 text-right">Seed PR</th>
+                      <th class="py-1.5 px-3 text-right no-print"></th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-700/50">
                     ${entries.map(r => `
                       <tr>
-                        <td class="py-2 px-4 font-semibold text-white">${r.athleteName}</td>
-                        <td class="py-2 px-4 text-slate-400 text-xs">${r.division}</td>
-                        <td class="py-2 px-4 text-amber-400 font-medium text-xs">${r.role}</td>
-                        <td class="py-2 px-4 font-mono font-bold text-white">${r.seedMark}</td>
-                        <td class="py-2 px-4 text-right no-print">
+                        <td class="py-2 px-3 font-semibold text-white">${r.athleteName}</td>
+                        <td class="py-2 px-3 text-slate-400 text-xs">${r.division}</td>
+                        <td class="py-2 px-3 text-amber-400 font-medium text-xs">${r.role}</td>
+                        <td class="py-2 px-3 font-mono font-bold text-white text-right">${r.seedMark}</td>
+                        <td class="py-2 px-3 text-right no-print">
                           <button onclick="removeLineupEntry(${r.id})" class="text-xs text-rose-400 hover:underline">Remove</button>
                         </td>
                       </tr>
