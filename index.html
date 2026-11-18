@@ -1393,7 +1393,7 @@
 
     function getActiveRelayLegIndex() {
       if (!isRelayModeActive()) return -1;
-      return swState.racers.findIndex(r => !r.finished);
+      return swState.racers.findIndex(r => r.id && !r.finished);
     }
 
     function getAthleteInitials(fullName) {
@@ -1404,19 +1404,19 @@
         .join('');
     }
 
-    function recordRacerSplit(athId, isFinish = false) {
+        function recordRacerSplit(racerIdx, isFinish = false) {
       if (!swState.running && swState.elapsedMs === 0) {
         return alert('Start the race clock first.');
       }
-      const racerIdx = swState.racers.findIndex(r => r.id === athId);
       const racer = swState.racers[racerIdx];
       if (!racer || racer.finished) return;
 
       const currentMs = swState.running ? (performance.now() - swState.startTime) : swState.elapsedMs;
 
       if (isRelayModeActive()) {
-        const prevLegTotalMs = racerIdx > 0 && swState.racers[racerIdx - 1].splits.length > 0
-          ? swState.racers[racerIdx - 1].splits[0].totalMs
+        const prevRacer = racerIdx > 0 ? swState.racers[racerIdx - 1] : null;
+        const prevLegTotalMs = (prevRacer && prevRacer.splits.length > 0)
+          ? prevRacer.splits.at(-1).totalMs
           : 0;
         const legSplitMs = Math.max(0, currentMs - prevLegTotalMs);
 
@@ -1426,8 +1426,17 @@
           totalMs: currentMs
         }];
         racer.finished = true;
+
+        const remainingLegs = swState.racers.slice(racerIdx + 1).filter(r => r.id);
+        if (isFinish || remainingLegs.length === 0) {
+          swState.running = false;
+          cancelAnimationFrame(swState.rafId);
+          swState.elapsedMs = currentMs;
+          renderStopwatchView();
+          return;
+        }
       } else {
-        const prevTotalMs = racer.splits.length > 0 ? racer.splits[racer.splits.length - 1].totalMs : 0;
+        const prevTotalMs = racer.splits.length > 0 ? racer.splits.at(-1).totalMs : 0;
         const lapMs = Math.max(0, currentMs - prevTotalMs);
 
         racer.splits.push({
@@ -1435,7 +1444,17 @@
           lapMs,
           totalMs: currentMs
         });
-        if (isFinish) racer.finished = true;
+
+        if (isFinish) {
+          racer.finished = true;
+          if (swState.racers.every(r => r.finished)) {
+            swState.running = false;
+            cancelAnimationFrame(swState.rafId);
+            swState.elapsedMs = currentMs;
+            renderStopwatchView();
+            return;
+          }
+        }
       }
 
       renderStopwatchRacers();
