@@ -2,11 +2,36 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
   <title>StatSplit — Track & Field Analytics</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+  <script src="https://cloudflare.com"></script>
   <style>
+    :root { color-scheme: dark; }
+    @media screen {
+      #meetLineupExportCard {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+      }
+      #meetLineupExportCard .print-event-box {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+      }
+      #meetLineupExportCard .print-event-header {
+        background-color: #020617 !important;
+      }
+      #meetLineupExportCard table,
+      #meetLineupExportCard tbody,
+      #meetLineupExportCard tr,
+      #meetLineupExportCard td {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+      }
+    }
     @media print {
       @page { margin: 0.3in; }
       body {
@@ -2137,24 +2162,59 @@
       renderLineupTable();
     }
 
-    async function downloadLineupPng() {
+        async function downloadLineupPng() {
       if (meetLineupRows.length === 0) {
         return alert('Add at least one athlete to the meet lineup before downloading the PNG.');
       }
       const cardEl = document.getElementById('meetLineupExportCard');
-      if (!cardEl || typeof html2canvas === 'undefined') return;
+      if (!cardEl) return;
+
+      if (typeof html2canvas === 'undefined') {
+        return alert('Image generator is still loading. Please try again in a moment.');
+      }
 
       const hiddenEls = cardEl.querySelectorAll('.no-print');
       hiddenEls.forEach(el => el.style.display = 'none');
 
       try {
-        const canvas = await html2canvas(cardEl, { backgroundColor: '#0f172a', scale: 2 });
+        const canvas = await html2canvas(cardEl, {
+          backgroundColor: '#0f172a',
+          scale: 2,
+          useCORS: true,
+          logging: false
+        });
+
         const rawTitle = document.getElementById('lineupMeetTitle')?.value.trim() || 'Meet_Lineup';
-        const safeFilename = rawTitle.replace(/[^a-zA-Z0-9_-]+/g, '_');
+        const safeFilename = `${rawTitle.replace(/[^a-zA-Z0-9_-]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.png`;
+        const dataUrl = canvas.toDataURL('image/png');
+
+        // Trigger download for Desktop / Android
         const link = document.createElement('a');
-        link.download = `${safeFilename}_${new Date().toISOString().slice(0, 10)}.png`;
-        link.href = canvas.toDataURL('image/png');
+        link.download = safeFilename;
+        link.href = dataUrl;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+
+        // Also open clean image modal for iOS Safari (long-press Save to Photos)
+        document.getElementById('modalsRoot').innerHTML = `
+          <div class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-4 space-y-3 shadow-2xl my-auto">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-bold text-white">Meet Lineup Graphic Ready</h3>
+                  <p class="text-[11px] text-slate-400">On mobile, press and hold the image to Save to Photos or Share.</p>
+                </div>
+                <button onclick="closeModals()" class="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold">Done</button>
+              </div>
+              <div class="max-h-[70vh] overflow-auto rounded-xl border border-slate-800">
+                <img src="${dataUrl}" alt="Meet Lineup" class="w-full h-auto block" />
+              </div>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        alert('Could not generate PNG: ' + err.message);
       } finally {
         hiddenEls.forEach(el => el.style.display = '');
       }
