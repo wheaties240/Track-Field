@@ -1976,7 +1976,7 @@
 
     let meetLineupRows = [];
 
-       function renderLineupBuilderView() {
+    function renderLineupBuilderView() {
       const container = document.getElementById('coachSubView');
       const enabledSet = new Set(getEnabledEventsList());
       const activeAthletes = [...appData.athletes]
@@ -2003,48 +2003,41 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-700">
+                        <!-- STEP 1: MEET DETAILS BOX -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-3">
+              <p class="text-xs font-bold uppercase tracking-wider text-rose-400">Step 1: Meet Details</p>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="min-w-0">
+                  <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Title</label>
+                  <input id="lineupMeetTitle" type="text" value="Official Meet Lineup" oninput="renderLineupTable()"
+                    placeholder="e.g. League Invitational"
+                    class="w-full min-w-0 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
+                </div>
+                <div class="min-w-0">
+                  <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Date</label>
+                  <input id="lineupMeetDate" type="date" value="${new Date().toISOString().slice(0, 10)}" onchange="renderLineupTable()"
+                    class="w-full min-w-0 max-w-full block bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
+                </div>
+                <div class="min-w-0">
+                  <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Location</label>
+                  <input id="lineupMeetLocation" type="text" value="" oninput="renderLineupTable()"
+                    placeholder="e.g. North Stadium / Home Track"
+                    class="w-full min-w-0 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
+                </div>
+              </div>
+            </div>
+
+            <!-- STEP 2: ATHLETE & EVENTS BOX -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-4">
               <div>
-                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">1. Select Athlete</label>
+                <p class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">Step 2: Select Athlete &amp; Events</p>
                 <select id="lineupAthlete" onchange="syncLineupCheckboxesForAthlete()"
                   class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-semibold">
                   <option value="">-- Choose Athlete --</option>
                   ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name} (${a.Division})</option>`).join('')}
                 </select>
               </div>
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Title</label>
-                <input id="lineupMeetTitle" type="text" value="Official Meet Lineup" oninput="renderLineupTable()"
-                  placeholder="e.g. League Invitational"
-                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
-              </div>
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Date</label>
-                <input id="lineupMeetDate" type="date" value="${new Date().toISOString().slice(0, 10)}" onchange="renderLineupTable()"
-                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
-              </div>
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Location</label>
-                <input id="lineupMeetLocation" type="text" value="" oninput="renderLineupTable()"
-                  placeholder="e.g. North Stadium / Home Track"
-                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
-              </div>
-            </div>
-                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Title</label>
-                <input id="lineupMeetTitle" type="text" value="Official Meet Lineup" oninput="renderLineupTable()"
-                  placeholder="e.g. League Invitational"
-                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
-              </div>
-              <div>
-                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Meet Location</label>
-                <input id="lineupMeetLocation" type="text" value="" oninput="renderLineupTable()"
-                  placeholder="e.g. North Stadium / Home Track"
-                  class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white" />
-              </div>
-            </div>
 
-            <div>
-              <label class="block text-xs font-semibold uppercase text-slate-400 mb-2">2. Check Events for Selected Athlete</label>
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 ${Object.entries(EVENT_CATALOG).map(([cat, events]) => {
                   const visible = events.filter(ev => enabledSet.has(ev));
