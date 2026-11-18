@@ -950,7 +950,7 @@
       switchCoachSubTab('launcher');
     }
 
-        function handleStopwatchEventChange(newEvent) {
+    function handleStopwatchEventChange(newEvent) {
       swState.event = newEvent;
       if (isRelayModeActive()) {
         swState.racers = [1, 2, 3, 4].map(leg => ({
@@ -980,7 +980,7 @@
       renderStopwatchRacers();
     }
 
-    function renderStopwatchView() {
+        function renderStopwatchView() {
       const container = document.getElementById('coachSubView');
       const trackEvents = getEnabledEventsList().filter(ev => !isFieldEvent(ev));
       if (!trackEvents.includes(swState.event) && trackEvents.length > 0) {
@@ -989,7 +989,7 @@
 
       const relayMode = isRelayModeActive();
       if (relayMode && swState.racers.length !== 4) {
-        swState.racers = [1, 2, 3, 4].map(leg => ({
+        swState.racers =.map(leg => ({
           id: '',
           name: '',
           division: '',
@@ -1010,52 +1010,49 @@
           <!-- PINNED TOP CLOCK BAR -->
           <div class="bg-slate-900 border-b border-slate-800 px-3 py-2.5 sm:px-5 sm:py-3 shrink-0 shadow-lg">
             <div class="max-w-4xl mx-auto">
+              <!-- ROW 1: EVENT BADGE + EXIT BUTTON -->
               <div class="flex items-center justify-between gap-2">
-                <div>
-                  <div class="flex items-center gap-1.5">
-                    <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-600/20 text-rose-400 border border-rose-500/30">${swState.event}</span>
-                    <span class="text-[11px] text-slate-400 truncate max-w-[140px] sm:max-w-xs">${swState.sessionName || 'Live Splits'}</span>
-                  </div>
-                  <div id="swClockDisplay" class="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white leading-none mt-1">
-                    ${formatStopwatchMs(swState.elapsedMs)}
-                  </div>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-600/20 text-rose-400 border border-rose-500/30 shrink-0">${swState.event}</span>
+                  <span class="text-xs text-slate-400 truncate">${swState.sessionName || 'Live Splits'}</span>
                 </div>
-
-                <div class="flex items-center gap-1.5 sm:gap-2">
-                  <button id="swStartPauseBtn" onclick="toggleStopwatch()"
-                    class="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm transition shadow ${
-                      swState.running
-                        ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    }">
-                    ${swState.running ? 'Pause' : (swState.elapsedMs > 0 ? 'Resume' : 'Start')}
-                  </button>
-                  <button onclick="resetStopwatch()"
-                    class="px-2.5 py-2.5 sm:px-3.5 sm:py-3 rounded-xl font-semibold text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition">
-                    Reset
-                  </button>
-                  <button onclick="saveStopwatchToProfiles()"
-                    class="px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl font-bold text-xs bg-rose-600 hover:bg-rose-500 text-white transition">
-                    Save
-                  </button>
-                  <button type="button" onclick="exitStopwatchFocusMode()" title="Exit Stopwatch"
-                    class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center font-bold text-sm transition ml-0.5">
-                    X
-                  </button>
-                </div>
+                <button type="button" onclick="exitStopwatchFocusMode()" title="Exit Stopwatch"
+                  class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center font-bold text-xs transition shrink-0">
+                  X
+                </button>
               </div>
 
-              <!-- SECOND COMPACT BAR -->
-              <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80 text-xs">
-                <span class="text-slate-400">${relayMode ? `${loadedCount}/4 Relay Legs Assigned` : `${loadedCount}/8 Racers Loaded`}</span>
+              <!-- ROW 2: BIG FULL-WIDTH CLOCK -->
+              <div id="swClockDisplay" class="text-center text-5xl sm:text-7xl font-black font-mono tracking-tight text-white leading-none py-2 select-none">
+                ${formatStopwatchMs(swState.elapsedMs)}
+              </div>
+
+              <!-- ROW 3: COMPACT CONTROL BUTTONS UNDER CLOCK -->
+              <div class="grid grid-cols-4 gap-1.5 sm:gap-2">
+                <button id="swStartPauseBtn" onclick="toggleStopwatch()"
+                  class="py-2 rounded-lg font-bold text-xs sm:text-sm transition shadow ${
+                    swState.running
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  }">
+                  ${swState.running ? 'Pause' : (swState.elapsedMs > 0 ? 'Resume' : 'Start')}
+                </button>
+                <button onclick="resetStopwatch()"
+                  class="py-2 rounded-lg font-semibold text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition">
+                  Reset
+                </button>
+                <button onclick="saveStopwatchToProfiles()"
+                  class="py-2 rounded-lg font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white transition">
+                  Save
+                </button>
                 <button type="button" onclick="toggleStopwatchSetup()"
-                  class="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1">
-                  ${swState.setupCollapsed ? 'Show Race Setup' : 'Hide Setup'}
+                  class="py-2 rounded-lg font-semibold text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-400 transition">
+                  ${swState.setupCollapsed ? 'Setup' : 'Hide Setup'}
                 </button>
               </div>
 
               <!-- COLLAPSIBLE RACE CONFIG DRAWER -->
-              <div class="${swState.setupCollapsed ? 'hidden' : 'grid'} grid-cols-1 ${relayMode ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-2.5 mt-2.5 pt-2.5 border-t border-slate-800">
+              <div class="${swState.setupCollapsed ? 'hidden' : 'grid'} grid-cols-1 ${relayMode ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-2 mt-2.5 pt-2.5 border-t border-slate-800">
                 <div>
                   <label class="block text-[10px] uppercase font-semibold text-slate-400 mb-0.5">Event</label>
                   <select id="swEventSelect" onchange="handleStopwatchEventChange(this.value)"
@@ -1095,7 +1092,7 @@
           </div>
 
           <!-- SCROLLABLE COMPACT RACERS LIST -->
-          <div class="flex-1 overflow-y-auto px-3 py-2.5 sm:px-5">
+          <div class="flex-1 overflow-y-auto px-3 py-2 sm:px-5">
             <div id="swRacersList" class="max-w-4xl mx-auto space-y-1.5"></div>
           </div>
         </div>
