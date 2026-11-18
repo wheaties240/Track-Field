@@ -989,7 +989,7 @@
 
       const relayMode = isRelayModeActive();
       if (relayMode && swState.racers.length !== 4) {
-        swState.racers =.map(leg => ({
+        swState.racers =[1, 2, 3, 4].map(leg => ({
           id: '',
           name: '',
           division: '',
