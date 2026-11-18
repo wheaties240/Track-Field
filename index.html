@@ -950,6 +950,36 @@
       switchCoachSubTab('launcher');
     }
 
+        function handleStopwatchEventChange(newEvent) {
+      swState.event = newEvent;
+      if (isRelayModeActive()) {
+        swState.racers = [1, 2, 3, 4].map(leg => ({
+          id: '',
+          name: '',
+          division: '',
+          lane: leg,
+          splits: [],
+          finished: false
+        }));
+      } else {
+        swState.racers = swState.racers.filter(r => r.id);
+      }
+      renderStopwatchView();
+    }
+
+    function setRelaySlotAthlete(slotIdx, athId) {
+      const ath = appData.athletes.find(a => a.Athlete_ID === athId);
+      swState.racers[slotIdx] = {
+        id: ath ? ath.Athlete_ID : '',
+        name: ath ? ath.Name : '',
+        division: ath ? ath.Division : '',
+        lane: slotIdx + 1,
+        splits: [],
+        finished: false
+      };
+      renderStopwatchRacers();
+    }
+
     function renderStopwatchView() {
       const container = document.getElementById('coachSubView');
       const trackEvents = getEnabledEventsList().filter(ev => !isFieldEvent(ev));
@@ -957,95 +987,124 @@
         swState.event = trackEvents;
       }
 
+      const relayMode = isRelayModeActive();
+      if (relayMode && swState.racers.length !== 4) {
+        swState.racers = [1, 2, 3, 4].map(leg => ({
+          id: '',
+          name: '',
+          division: '',
+          lane: leg,
+          splits: [],
+          finished: false
+        }));
+      }
+
       const activeAthletes = [...appData.athletes]
         .filter(a => a.Status === 'Active')
         .sort((a, b) => a.Name.localeCompare(b.Name));
 
+      const loadedCount = swState.racers.filter(r => r.id).length;
+
       container.innerHTML = `
-        <div class="space-y-3">
-          <!-- COMPACT STICKY CLOCK BAR -->
-          <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 sm:p-5 shadow-xl sticky top-16 z-20">
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div class="text-center sm:text-left">
-                <div class="flex items-center justify-center sm:justify-start gap-2">
-                  <span class="text-[11px] font-bold uppercase tracking-widest text-rose-400">${swState.event}</span>
-                  <span class="text-xs text-slate-400">&bull; ${swState.sessionName || 'Live Splits'}</span>
+        <div class="fixed inset-0 z-50 bg-slate-950 flex flex-col h-[100dvh] overflow-hidden">
+          <!-- PINNED TOP CLOCK BAR -->
+          <div class="bg-slate-900 border-b border-slate-800 px-3 py-2.5 sm:px-5 sm:py-3 shrink-0 shadow-lg">
+            <div class="max-w-4xl mx-auto">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-600/20 text-rose-400 border border-rose-500/30">${swState.event}</span>
+                    <span class="text-[11px] text-slate-400 truncate max-w-[140px] sm:max-w-xs">${swState.sessionName || 'Live Splits'}</span>
+                  </div>
+                  <div id="swClockDisplay" class="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white leading-none mt-1">
+                    ${formatStopwatchMs(swState.elapsedMs)}
+                  </div>
                 </div>
-                <div id="swClockDisplay" class="text-4xl sm:text-6xl font-black font-mono tracking-tight text-white">
-                  ${formatStopwatchMs(swState.elapsedMs)}
+
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                  <button id="swStartPauseBtn" onclick="toggleStopwatch()"
+                    class="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm transition shadow ${
+                      swState.running
+                        ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    }">
+                    ${swState.running ? 'Pause' : (swState.elapsedMs > 0 ? 'Resume' : 'Start')}
+                  </button>
+                  <button onclick="resetStopwatch()"
+                    class="px-2.5 py-2.5 sm:px-3.5 sm:py-3 rounded-xl font-semibold text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition">
+                    Reset
+                  </button>
+                  <button onclick="saveStopwatchToProfiles()"
+                    class="px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl font-bold text-xs bg-rose-600 hover:bg-rose-500 text-white transition">
+                    Save
+                  </button>
+                  <button type="button" onclick="exitStopwatchFocusMode()" title="Exit Stopwatch"
+                    class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center font-bold text-sm transition ml-0.5">
+                    X
+                  </button>
                 </div>
               </div>
 
-              <div class="flex flex-wrap items-center justify-center gap-2">
-                <button id="swStartPauseBtn" onclick="toggleStopwatch()"
-                  class="px-5 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition shadow-lg ${
-                    swState.running
-                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                      : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                  }">
-                  ${swState.running ? 'Pause' : (swState.elapsedMs > 0 ? 'Resume' : 'Start Race')}
-                </button>
-                <button onclick="resetStopwatch()"
-                  class="px-3.5 py-2.5 sm:py-3 rounded-xl font-semibold text-xs sm:text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 transition">
-                  Reset
-                </button>
-                <button onclick="saveStopwatchToProfiles()"
-                  class="px-4 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/30 transition">
-                  Save Splits
-                </button>
+              <!-- SECOND COMPACT BAR -->
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80 text-xs">
+                <span class="text-slate-400">${relayMode ? `${loadedCount}/4 Relay Legs Assigned` : `${loadedCount}/8 Racers Loaded`}</span>
                 <button type="button" onclick="toggleStopwatchSetup()"
-                  class="px-3 py-2.5 sm:py-3 rounded-xl font-semibold text-xs bg-slate-900 border border-slate-700 text-amber-400 hover:border-amber-500 transition">
-                  ${swState.setupCollapsed ? 'Edit Setup (' + swState.racers.length + ')' : 'Set Racers'}
+                  class="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1">
+                  ${swState.setupCollapsed ? 'Show Race Setup' : 'Hide Setup'}
                 </button>
               </div>
-            </div>
 
-            <!-- COLLAPSIBLE RACE CONFIG BAR -->
-            <div class="${swState.setupCollapsed ? 'hidden' : 'grid'} grid-cols-1 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-slate-700">
-              <div>
-                <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Race / Relay Event</label>
-                <select id="swEventSelect" onchange="swState.event = this.value; renderStopwatchView();"
-                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
-                  ${trackEvents.map(ev => `<option value="${ev}" ${ev === swState.event ? 'selected' : ''}>${ev}</option>`).join('')}
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Session / Heat Label</label>
-                <input id="swSessionName" type="text" value="${swState.sessionName}" oninput="swState.sessionName = this.value"
-                  placeholder="e.g. Heat 1 or Tuesday Tempo"
-                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white" />
-              </div>
-              <div>
-                <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Record As</label>
-                <select onchange="swState.isOfficial = (this.value === 'true')"
-                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
-                  <option value="false" ${!swState.isOfficial ? 'selected' : ''}>Unofficial Splits / Practice</option>
-                  <option value="true" ${swState.isOfficial ? 'selected' : ''}>Official Meet</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] uppercase font-semibold text-slate-400 mb-1">Add Racer (${swState.racers.length}/8)</label>
-                <div class="flex gap-1.5">
-                  <select id="swAddAthleteSelect" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-sm text-white">
-                    <option value="">Select athlete...</option>
-                    ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name}</option>`).join('')}
+              <!-- COLLAPSIBLE RACE CONFIG DRAWER -->
+              <div class="${swState.setupCollapsed ? 'hidden' : 'grid'} grid-cols-1 ${relayMode ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-2.5 mt-2.5 pt-2.5 border-t border-slate-800">
+                <div>
+                  <label class="block text-[10px] uppercase font-semibold text-slate-400 mb-0.5">Event</label>
+                  <select id="swEventSelect" onchange="handleStopwatchEventChange(this.value)"
+                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white">
+                    ${trackEvents.map(ev => `<option value="${ev}" ${ev === swState.event ? 'selected' : ''}>${ev}</option>`).join('')}
                   </select>
-                  <button type="button" onclick="addRacerToStopwatch()"
-                    class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3.5 py-2 rounded-xl text-sm">Add</button>
                 </div>
+                <div>
+                  <label class="block text-[10px] uppercase font-semibold text-slate-400 mb-0.5">Heat / Session</label>
+                  <input id="swSessionName" type="text" value="${swState.sessionName}" oninput="swState.sessionName = this.value"
+                    placeholder="e.g. Heat 1"
+                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase font-semibold text-slate-400 mb-0.5">Type</label>
+                  <select onchange="swState.isOfficial = (this.value === 'true')"
+                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white">
+                    <option value="false" ${!swState.isOfficial ? 'selected' : ''}>Practice / Splits</option>
+                    <option value="true" ${swState.isOfficial ? 'selected' : ''}>Official Meet</option>
+                  </select>
+                </div>
+                ${relayMode ? '' : `
+                  <div>
+                    <label class="block text-[10px] uppercase font-semibold text-slate-400 mb-0.5">Add Athlete (${loadedCount}/8)</label>
+                    <div class="flex gap-1">
+                      <select id="swAddAthleteSelect" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white">
+                        <option value="">Select athlete...</option>
+                        ${activeAthletes.map(a => `<option value="${a.Athlete_ID}">${a.Name}</option>`).join('')}
+                      </select>
+                      <button type="button" onclick="addRacerToStopwatch()"
+                        class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs">Add</button>
+                    </div>
+                  </div>
+                `}
               </div>
             </div>
           </div>
 
-          <!-- ACTIVE RACERS LIST -->
-          <div id="swRacersList" class="space-y-2.5"></div>
+          <!-- SCROLLABLE COMPACT RACERS LIST -->
+          <div class="flex-1 overflow-y-auto px-3 py-2.5 sm:px-5">
+            <div id="swRacersList" class="max-w-4xl mx-auto space-y-1.5"></div>
+          </div>
         </div>
       `;
 
       renderStopwatchRacers();
     }
 
-        function updateStopwatchTick() {
+    function updateStopwatchTick() {
       if (!swState.running) return;
       swState.elapsedMs = performance.now() - swState.startTime;
       const display = document.getElementById('swClockDisplay');
@@ -1053,9 +1112,10 @@
       swState.rafId = requestAnimationFrame(updateStopwatchTick);
     }
 
-    function toggleStopwatchSetup() {
-      if (!swState.setupCollapsed && swState.racers.length === 0) {
-        return alert('Add at least one athlete first.');
+   function toggleStopwatchSetup() {
+      const hasAthletes = swState.racers.some(r => r.id);
+      if (!swState.setupCollapsed && !hasAthletes) {
+        return alert('Assign at least one athlete first.');
       }
       swState.setupCollapsed = !swState.setupCollapsed;
       renderStopwatchView();
@@ -1066,8 +1126,9 @@
         swState.running = false;
         cancelAnimationFrame(swState.rafId);
       } else {
-        if (swState.racers.length === 0) {
-          return alert('Add at least one athlete to the race before starting the clock.');
+        const hasAthletes = swState.racers.some(r => r.id);
+        if (!hasAthletes) {
+          return alert('Select at least one athlete before starting the clock.');
         }
         swState.running = true;
         swState.setupCollapsed = true;
@@ -1078,12 +1139,19 @@
     }
 
     function resetStopwatch() {
-      if ((swState.elapsedMs > 0 || swState.racers.length > 0) && !confirm('Reset the stopwatch and clear all athletes and unsaved splits?')) return;
+      const hasAthletes = swState.racers.some(r => r.id);
+      if ((swState.elapsedMs > 0 || hasAthletes) && !confirm('Reset the stopwatch and clear athletes and unsaved splits?')) return;
       swState.running = false;
       cancelAnimationFrame(swState.rafId);
       swState.elapsedMs = 0;
-      swState.racers = [];
       swState.setupCollapsed = false;
+      if (isRelayModeActive()) {
+        swState.racers = [1, 2, 3, 4].map(leg => ({
+          id: '', name: '', division: '', lane: leg, splits: [], finished: false
+        }));
+      } else {
+        swState.racers = [];
+      }
       renderStopwatchView();
     }
 
@@ -1122,32 +1190,59 @@
       if (racer) racer.lane = newLane;
     }
 
-    function recordRacerSplit(athId, isFinish = false) {
+    function recordRacerSplit(racerIdx, isFinish = false) {
       if (!swState.running && swState.elapsedMs === 0) {
         return alert('Start the race clock first.');
       }
-      const racer = swState.racers.find(r => r.id === athId);
+      const racer = swState.racers[racerIdx];
       if (!racer || racer.finished) return;
 
       const currentMs = swState.running ? (performance.now() - swState.startTime) : swState.elapsedMs;
-      const prevTotalMs = racer.splits.length > 0 ? racer.splits[racer.splits.length - 1].totalMs : 0;
-      const lapMs = Math.max(0, currentMs - prevTotalMs);
 
-      racer.splits.push({
-        lap: racer.splits.length + 1,
-        lapMs,
-        totalMs: currentMs
-      });
+      if (isRelayModeActive()) {
+        const prevLegTotalMs = racerIdx > 0 && swState.racers[racerIdx - 1].splits.length > 0
+          ? swState.racers[racerIdx - 1].splits.totalMs
+          : 0;
+        const legSplitMs = Math.max(0, currentMs - prevLegTotalMs);
 
-      if (isFinish) racer.finished = true;
-      renderStopwatchRacers();
-    }
+        racer.splits = [{
+          lap: racerIdx + 1,
+          lapMs: legSplitMs,
+          totalMs: currentMs
+        }];
+        racer.finished = true;
 
-    function undoRacerLastSplit(athId) {
-      const racer = swState.racers.find(r => r.id === athId);
-      if (!racer || racer.splits.length === 0) return;
-      racer.splits.pop();
-      racer.finished = false;
+        // Auto-stop clock when Anchor (or last assigned leg) finishes
+        const remainingLegs = swState.racers.slice(racerIdx + 1).filter(r => r.id);
+        if (isFinish || remainingLegs.length === 0) {
+          swState.running = false;
+          cancelAnimationFrame(swState.rafId);
+          swState.elapsedMs = currentMs;
+          renderStopwatchView();
+          return;
+        }
+      } else {
+        const prevTotalMs = racer.splits.length > 0 ? racer.splits[racer.splits.length - 1].totalMs : 0;
+        const lapMs = Math.max(0, currentMs - prevTotalMs);
+
+        racer.splits.push({
+          lap: racer.splits.length + 1,
+          lapMs,
+          totalMs: currentMs
+        });
+        if (isFinish) {
+          racer.finished = true;
+          // Auto-stop clock if all racers in the heat have finished
+          if (swState.racers.every(r => r.finished)) {
+            swState.running = false;
+            cancelAnimationFrame(swState.rafId);
+            swState.elapsedMs = currentMs;
+            renderStopwatchView();
+            return;
+          }
+        }
+      }
+
       renderStopwatchRacers();
     }
 
@@ -1155,68 +1250,90 @@
       const list = document.getElementById('swRacersList');
       if (!list) return;
 
-      if (swState.racers.length === 0) {
+      const relayMode = isRelayModeActive();
+      const activeLegIdx = getActiveRelayLegIndex();
+      const activeAthletes = [...appData.athletes]
+        .filter(a => a.Status === 'Active')
+        .sort((a, b) => a.Name.localeCompare(b.Name));
+
+      if (!relayMode && swState.racers.length === 0) {
         list.innerHTML = `
-          <div class="bg-slate-800/60 border border-dashed border-slate-700 rounded-2xl p-8 text-center text-sm text-slate-400">
-            Select up to 8 athletes above to load them into lanes for live split timing.
+          <div class="bg-slate-900/70 border border-dashed border-slate-800 rounded-xl p-6 text-center text-xs text-slate-400">
+            Add up to 8 athletes above, then tap <span class="text-amber-400 font-semibold">Hide Setup</span> or <span class="text-emerald-400 font-semibold">Start</span>.
           </div>`;
         return;
       }
 
-      list.innerHTML = swState.racers.map(r => {
+      list.innerHTML = swState.racers.map((r, idx) => {
         const lastSplit = r.splits.length > 0 ? r.splits[r.splits.length - 1] : null;
-        const splitsSummary = r.splits.map(s =>
-          `<span class="inline-block bg-slate-900 border border-slate-700 rounded-md px-2 py-0.5 text-[11px] font-mono text-slate-300">L${s.lap}: ${formatStopwatchMs(s.lapMs)} <span class="text-slate-500">(${formatStopwatchMs(s.totalMs)})</span></span>`
-        ).join(' ');
+        const isCurrentBaton = relayMode && r.id && idx === activeLegIdx;
+        const isWaitingBaton = relayMode && r.id && idx > activeLegIdx && activeLegIdx !== -1;
+        const assignedLegs = swState.racers.filter(x => x.id);
+        const isAnchor = relayMode && r.id && (assignedLegs.length > 0 && assignedLegs[assignedLegs.length - 1] === r);
+
+        const lapHistory = relayMode
+          ? (lastSplit
+              ? `Split: ${formatStopwatchMs(lastSplit.lapMs)} · Team: ${formatStopwatchMs(lastSplit.totalMs)}`
+              : (!r.id ? 'Select runner for this leg' : (isCurrentBaton ? 'Holding Baton' : `Waiting for Leg ${idx}`)))
+          : (r.splits.map(s => `L${s.lap}:${formatStopwatchMs(s.lapMs)}`).join(' · ') || 'Ready');
 
         return `
-          <div class="bg-slate-800 border ${r.finished ? 'border-amber-500/60' : 'border-slate-700'} rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div class="flex items-start sm:items-center gap-3">
-              <div class="flex flex-col items-center">
-                <span class="text-[10px] uppercase text-slate-400">Lane</span>
-                <input type="number" min="1" max="12" value="${r.lane}" onchange="updateRacerLane('${r.id}', this.value)"
-                  class="w-12 text-center bg-slate-900 border border-slate-700 rounded-lg py-1 font-mono font-bold text-amber-400 text-sm" />
-              </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="text-base font-bold text-white">${r.name}</span>
-                  <span class="text-xs text-slate-400">(${r.division})</span>
-                  ${r.finished ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[11px] font-bold uppercase">Finished</span>` : ''}
-                </div>
-                <div class="flex flex-wrap gap-1.5 mt-1.5">
-                  ${splitsSummary || `<span class="text-xs text-slate-500">No splits recorded yet</span>`}
-                </div>
+          <div class="bg-slate-900 border ${isCurrentBaton ? 'border-rose-500 ring-1 ring-rose-500/40' : (r.finished ? 'border-amber-500/50' : 'border-slate-800')} rounded-xl px-2.5 py-2 flex items-center justify-between gap-2 transition">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              ${relayMode
+                ? `<span class="px-2 py-1 rounded-lg font-mono font-bold text-[11px] shrink-0 ${isCurrentBaton ? 'bg-rose-600 text-white' : 'bg-slate-950 border border-slate-800 text-amber-400'}">Leg ${idx + 1}</span>`
+                : `<input type="number" min="1" max="12" value="${r.lane}" onchange="updateRacerLane('${r.id}', this.value)" title="Lane" class="w-8 h-8 text-center bg-slate-950 border border-slate-800 rounded-lg font-mono font-bold text-amber-400 text-xs shrink-0" />`
+              }
+              <div class="min-w-0 flex-1">
+                ${relayMode && !swState.running && swState.elapsedMs === 0 ? `
+                  <select onchange="setRelaySlotAthlete(${idx}, this.value)"
+                    class="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold text-white">
+                    <option value="">-- Select Leg ${idx + 1} Runner --</option>
+                    ${activeAthletes.map(a => `<option value="${a.Athlete_ID}" ${a.Athlete_ID === r.id ? 'selected' : ''}>${a.Name}</option>`).join('')}
+                  </select>
+                ` : `
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-sm font-bold text-white truncate">${r.name || `Unassigned Leg ${idx + 1}`}</span>
+                    ${r.finished ? `<span class="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold uppercase shrink-0">Done</span>` : ''}
+                  </div>
+                `}
+                <p class="text-[11px] font-mono ${isCurrentBaton ? 'text-rose-300' : 'text-slate-400'} truncate mt-0.5">
+                  ${lapHistory}
+                </p>
               </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between lg:justify-end gap-3 border-t lg:border-t-0 border-slate-700/70 pt-3 lg:pt-0">
-              <div class="text-right mr-1">
-                <span class="block text-[10px] uppercase text-slate-400">${lastSplit ? `Lap ${lastSplit.lap} Split` : 'Elapsed'}</span>
-                <span class="font-mono font-black text-lg text-amber-400">${lastSplit ? formatStopwatchMs(lastSplit.lapMs) : '--'}</span>
-              </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              ${relayMode ? `
+                <button type="button" onclick="recordRacerSplit(${idx}, ${isAnchor})" ${!r.id || r.finished || isWaitingBaton ? 'disabled' : ''}
+                  class="px-3 py-2 rounded-lg font-bold text-xs transition ${
+                    !r.id || r.finished || isWaitingBaton
+                      ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                      : (isAnchor
+                          ? 'bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950'
+                          : 'bg-rose-600 hover:bg-rose-500 active:scale-95 text-white shadow')
+                  }">
+                  ${r.finished ? formatStopwatchMs(lastSplit.lapMs) : (isAnchor ? 'Anchor Finish' : `Handoff -> L${idx + 2}`)}
+                </button>
+              ` : `
+                <button type="button" onclick="recordRacerSplit(${idx}, false)" ${r.finished ? 'disabled' : ''}
+                  class="px-3 py-2 rounded-lg font-bold text-xs transition ${
+                    r.finished ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-500 active:scale-95 text-white'
+                  }">
+                  Split${r.splits.length > 0 ? ` (${r.splits.length})` : ''}
+                </button>
+                <button type="button" onclick="recordRacerSplit(${idx}, true)" ${r.finished ? 'disabled' : ''}
+                  class="px-2.5 py-2 rounded-lg font-bold text-xs transition ${
+                    r.finished ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950'
+                  }">
+                  Fin
+                </button>
+              `}
 
-              <button type="button" onclick="recordRacerSplit('${r.id}', false)" ${r.finished ? 'disabled' : ''}
-                class="px-5 py-3 rounded-xl font-bold text-sm transition ${
-                  r.finished
-                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                    : 'bg-rose-600 hover:bg-rose-500 active:scale-95 text-white shadow-md shadow-rose-900/30'
-                }">
-                Split / Lap
-              </button>
-
-              <button type="button" onclick="recordRacerSplit('${r.id}', true)" ${r.finished ? 'disabled' : ''}
-                class="px-4 py-3 rounded-xl font-bold text-sm transition ${
-                  r.finished
-                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                    : 'bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950'
-                }">
-                Finish
-              </button>
-
-              <div class="flex flex-col gap-1 text-[11px]">
-                ${r.splits.length > 0 ? `<button type="button" onclick="undoRacerLastSplit('${r.id}')" class="text-slate-400 hover:text-amber-400 underline">Undo</button>` : ''}
-                <button type="button" onclick="removeRacerFromStopwatch('${r.id}')" class="text-slate-500 hover:text-rose-400 underline">Remove</button>
-              </div>
+              ${r.splits.length > 0
+                ? `<button type="button" onclick="undoRacerLastSplit('${r.id}')" title="Undo" class="px-1.5 py-1 text-[11px] text-slate-400 hover:text-amber-400">Undo</button>`
+                : (!relayMode ? `<button type="button" onclick="removeRacerFromStopwatch('${r.id}')" title="Remove" class="px-1.5 py-1 text-[11px] text-slate-500 hover:text-rose-400">Del</button>` : '')
+              }
             </div>
           </div>
         `;
