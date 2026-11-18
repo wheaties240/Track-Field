@@ -1338,7 +1338,7 @@
     }
 
     async function saveStopwatchToProfiles() {
-      const racersWithSplits = swState.racers.filter(r => r.splits.length > 0);
+      const racersWithSplits = swState.racers.filter(r => r.id && r.splits.length > 0);
       if (racersWithSplits.length === 0) {
         return alert('Record at least one split before saving to athlete profiles.');
       }
@@ -1354,40 +1354,84 @@
 
       const today = new Date().toISOString().slice(0, 10);
       const baseLabel = swState.sessionName.trim() || 'Track Splits';
+      const logsToSave = [];
 
-      const logsToSave = racersWithSplits.map(r => {
-        const finalSplit = r.splits[r.splits.length - 1];
-        const totalSec = Number((finalSplit.totalMs / 1000).toFixed(2));
-        const formattedTotal = formatStopwatchMs(finalSplit.totalMs);
-        const lapBreakdown = r.splits.map(s => `L${s.lap}:${formatStopwatchMs(s.lapMs)}`).join(' | ');
+      if (isRelayModeActive()) {
+        const finalRunner = racersWithSplits.at(-1);
+        const teamTotalMs = finalRunner.splits.at(-1).totalMs;
+        const formattedTeamTotal = formatStopwatchMs(teamTotalMs);
+        const teamTotalSec = Number((teamTotalMs / 1000).toFixed(2));
 
-        return {
-          Date: today,
-          Meet_Name: `${baseLabel} [${lapBreakdown}]`,
-          Athlete_ID: r.id,
-          Athlete_Name: r.name,
-          Division: r.division,
-          Category: category,
-          Event: swState.event,
-          Raw_Mark: formattedTotal,
-          Numeric_Value: totalSec,
-          Is_Official: swState.isOfficial,
-          Entered_By: 'Coach-Stopwatch'
-        };
-      });
+        racersWithSplits.forEach((r, i) => {
+          const legMs = r.splits.at(-1).lapMs;
+          const teammateInitials = racersWithSplits
+            .filter((_, idx) => idx !== i)
+            .map(tm => getAthleteInitials(tm.name))
+            .join(', ');
+          const squadTag = teammateInitials ? `w/ ${teammateInitials}` : 'Solo Relay';
+
+          logsToSave.push({
+            Date: today,
+            Meet_Name: `${baseLabel} — Leg ${i + 1} Split [Team Relay ${squadTag}: ${formattedTeamTotal}]`,
+            Athlete_ID: r.id,
+            Athlete_Name: r.name,
+            Division: r.division,
+            Category: 'Relays',
+            Event: `${swState.event} (Leg Split)`,
+            Raw_Mark: formatStopwatchMs(legMs),
+            Numeric_Value: Number((legMs / 1000).toFixed(2)),
+            Is_Official: swState.isOfficial,
+            Entered_By: 'Coach-RelayTimer'
+          });
+
+          logsToSave.push({
+            Date: today,
+            Meet_Name: `${baseLabel} [Team Relay — Leg ${i + 1} ${squadTag}]`,
+            Athlete_ID: r.id,
+            Athlete_Name: r.name,
+            Division: r.division,
+            Category: 'Relays',
+            Event: swState.event,
+            Raw_Mark: formattedTeamTotal,
+            Numeric_Value: teamTotalSec,
+            Is_Official: swState.isOfficial,
+            Entered_By: 'Coach-RelayTimer'
+          });
+        });
+      } else {
+        racersWithSplits.forEach(r => {
+          const finalSplit = r.splits.at(-1);
+          const totalSec = Number((finalSplit.totalMs / 1000).toFixed(2));
+          const formattedTotal = formatStopwatchMs(finalSplit.totalMs);
+          const lapBreakdown = r.splits.map(s => `L${s.lap}:${formatStopwatchMs(s.lapMs)}`).join(' | ');
+
+          logsToSave.push({
+            Date: today,
+            Meet_Name: `${baseLabel} [${lapBreakdown}]`,
+            Athlete_ID: r.id,
+            Athlete_Name: r.name,
+            Division: r.division,
+            Category: category,
+            Event: swState.event,
+            Raw_Mark: formattedTotal,
+            Numeric_Value: totalSec,
+            Is_Official: swState.isOfficial,
+            Entered_By: 'Coach-Stopwatch'
+          });
+        });
+      }
 
       await StorageAdapter.addLogs(logsToSave);
       appData = await StorageAdapter.getAllData();
 
-      alert(`Saved split data and race marks for ${logsToSave.length} athlete(s).`);
+      alert(`Saved ${logsToSave.length} record(s) to athlete profiles.`);
       swState.elapsedMs = 0;
-      swState.racers.forEach(r => {
-        r.splits = [];
-        r.finished = false;
-      });
+      swState.racers = isRelayModeActive() ? createEmptyRelaySlots() : [];
+      swState.setupCollapsed = false;
       renderStopwatchView();
     }
-        function isRelayModeActive() {
+
+    function isRelayModeActive() {
       return swState.event.includes('Relay');
     }
 
